@@ -1,0 +1,301 @@
+@model MappingViewer.Web.Models.WorkbookData
+@using MappingViewer.Web.Services
+@inject IExcelReaderService ExcelReader
+@{
+    ViewData["Title"] = Model.FileName;
+    var workbookFiles = ViewBag.WorkbookFiles as List<string> ?? new List<string>();
+    var currentFile = ViewBag.CurrentFile as string ?? Model.FileName;
+
+    string CellStyle(MappingViewer.Web.Models.CellData c)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(c.BackgroundColor)
+            && ExcelReaderService.IsValidHexColor(c.BackgroundColor)
+            && !ExcelReader.IsNeutralDisplayColor(c.BackgroundColor))
+            parts.Add($"background-color:#{c.BackgroundColor}");
+        if (ExcelReaderService.IsValidHexColor(c.FontColor ?? ""))
+            parts.Add($"color:#{c.FontColor}");
+        if (c.Bold) parts.Add("font-weight:600");
+        if (c.Indent > 0)
+            parts.Add($"padding-left:{10 + c.Indent * 3}px");
+        var align = c.HorizontalAlignment?.ToLowerInvariant() switch
+        {
+            "center" => "center",
+            "right" => "right",
+            "left" or "general" => "left",
+            _ => null
+        };
+        if (align != null) parts.Add($"text-align:{align}");
+        return parts.Count == 0 ? "" : string.Join(";", parts);
+    }
+
+    string CellDisplayClass(MappingViewer.Web.Models.CellData c)
+    {
+        return (c.WrapText || c.Value.Contains('\n') || c.Value.Contains('\r'))
+            ? "cell-display cell-display--wrap"
+            : "cell-display";
+    }
+}
+
+<section class="viewer-page">
+    <div class="viewer-toolbar">
+        <label class="viewer-toolbar__label visually-hidden" for="workbookSelect">Workbook</label>
+        <select id="workbookSelect" class="workbook-select" aria-label="Select workbook">
+            @foreach (var f in workbookFiles)
+            {
+                if (string.Equals(f, currentFile, StringComparison.OrdinalIgnoreCase))
+                {
+                    <option value="@f" selected="selected">@f</option>
+                }
+                else
+                {
+                    <option value="@f">@f</option>
+                }
+            }
+        </select>
+
+        <span class="viewer-toolbar__filename" title="@Model.FileName">@Model.FileName</span>
+        <span class="viewer-toolbar__meta">@Model.Sheets.Count sheet(s)</span>
+
+        <label class="description-toggle viewer-toolbar__toggle">
+            <input id="showDescription" type="checkbox" checked />
+            <span>Show description</span>
+        </label>
+
+        <div class="viewer-toolbar__spacer"></div>
+
+        <input id="globalSearch" class="viewer-toolbar__search" type="search"
+               placeholder="Filter all columns…" autocomplete="off" />
+        <label class="case-toggle viewer-toolbar__case">
+            <input id="caseSensitive" type="checkbox" />
+            <span>Case sensitive</span>
+        </label>
+    </div>
+
+    @if (Model.Sheets.Count == 0)
+    {
+        <p class="empty viewer-page__empty">This workbook contains no sheets.</p>
+    }
+    else
+    {
+        <div class="viewer-tabs" role="tablist">
+            @for (var i = 0; i < Model.Sheets.Count; i++)
+            {
+                var sheet = Model.Sheets[i];
+                var active = i == 0 ? "tab--active" : "";
+                var totalRows = sheet.Tables.Sum(t => t.Rows.Count);
+                <button type="button" role="tab"
+                        class="tab @active"
+                        data-sheet-target="sheet-@i"
+                        aria-selected="@(i == 0 ? "true" : "false")">
+                    @sheet.Name
+                    <span class="tab__count">@totalRows</span>
+                </button>
+            }
+        </div>
+
+        <div class="viewer-workspace">
+            @for (var i = 0; i < Model.Sheets.Count; i++)
+            {
+                var sheet = Model.Sheets[i];
+                var hidden = i == 0 ? "" : "is-hidden";
+                var hasFreeform = sheet.Description.Count > 0
+                    || sheet.Blocks.Any(b => b.FreeformRows != null && b.FreeformRows.Count > 0);
+
+                <div id="sheet-@i" class="sheet-panel @hidden" role="tabpanel" data-sheet-name="@sheet.Name">
+
+                    @if (hasFreeform)
+                    {
+                        <div class="freeform-panel" data-freeform-panel>
+                            @if (sheet.Description.Count > 0)
+                            {
+                                <div class="description-block">
+                                    <div class="description-block__label">Description</div>
+                                    <table class="description-table">
+                                        <tbody>
+                                            @foreach (var row in sheet.Description)
+                                            {
+                                                <tr>
+                                                    @foreach (var cell in row)
+                                                    {
+                                                        <td class="@CellDisplayClass(cell)"
+                                                            style="@CellStyle(cell)"
+                                                            data-full-text="@cell.Value">@cell.Value</td>
+                                                    }
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+
+                            @for (var bi = 0; bi < sheet.Blocks.Count; bi++)
+                            {
+                                var block = sheet.Blocks[bi];
+                                @if (block.FreeformRows != null && block.FreeformRows.Count > 0)
+                                {
+                                    <div class="description-block description-block--inline">
+                                        <table class="description-table">
+                                            <tbody>
+                                                @foreach (var row in block.FreeformRows)
+                                                {
+                                                    <tr>
+                                                        @foreach (var cell in row)
+                                                        {
+                                                            <td class="@CellDisplayClass(cell)"
+                                                                style="@CellStyle(cell)"
+                                                                data-full-text="@cell.Value">@cell.Value</td>
+                                                        }
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    }
+
+                    @if (sheet.Blocks.Count == 0 && sheet.Description.Count == 0)
+                    {
+                        <p class="empty">This sheet is empty.</p>
+                    }
+
+                    <div class="tables-stack">
+                        @for (var bi = 0; bi < sheet.Blocks.Count; bi++)
+                        {
+                            var block = sheet.Blocks[bi];
+                            @if (block.Table != null)
+                            {
+                                var table = block.Table;
+                                <div class="table-block" data-table-index="@bi">
+                                    @{
+                                        var titleStyle = "";
+                                        if (!string.IsNullOrEmpty(table.Title))
+                                        {
+                                            if (!string.IsNullOrEmpty(table.TitleBackgroundColor)
+                                                && ExcelReaderService.IsValidHexColor(table.TitleBackgroundColor)
+                                                && !ExcelReader.IsNeutralDisplayColor(table.TitleBackgroundColor))
+                                                titleStyle += $"background-color:#{table.TitleBackgroundColor};";
+                                            if (ExcelReaderService.IsValidHexColor(table.TitleFontColor ?? ""))
+                                                titleStyle += $"color:#{table.TitleFontColor};";
+                                        }
+                                    }
+                                    <div class="table-block__bar" style="@titleStyle">
+                                        <span class="table-block__title-text">@(table.Title ?? "Table")</span>
+                                        <div class="table-block__actions">
+                                            <button type="button" class="btn-tool" data-expand-table title="Expand table">
+                                                <span class="btn-tool__icon" aria-hidden="true">⛶</span>
+                                                <span>Expand</span>
+                                            </button>
+                                            <button type="button" class="btn-tool" data-reset-columns title="Reset column order and width">
+                                                <span class="btn-tool__icon" aria-hidden="true">↺</span>
+                                                <span>Reset cols</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="table-scroll">
+                                        <table class="data-table" id="table-@i-@bi">
+                                            <colgroup>
+                                                @for (var c = 0; c < table.Headers.Count; c++)
+                                                {
+                                                    <col data-col-idx="@c" />
+                                                }
+                                            </colgroup>
+                                            <thead>
+                                                <tr class="data-table__headers">
+                                                    @for (var c = 0; c < table.Headers.Count; c++)
+                                                    {
+                                                        var h = table.Headers[c];
+                                                        <th class="data-table__th @CellDisplayClass(h)"
+                                                            data-col-idx="@c"
+                                                            draggable="true"
+                                                            style="@CellStyle(h)"
+                                                            data-full-text="@h.Value">
+                                                            <span class="th-label">@h.Value</span>
+                                                            <span class="col-resize-handle" title="Resize column"></span>
+                                                        </th>
+                                                    }
+                                                </tr>
+                                                <tr class="data-table__filters">
+                                                    @for (var c = 0; c < table.Headers.Count; c++)
+                                                    {
+                                                        <th class="data-table__filter-th" data-col-idx="@c">
+                                                            <input type="search" class="col-filter"
+                                                                   data-col="@c"
+                                                                   placeholder="Filter…"
+                                                                   autocomplete="off" />
+                                                        </th>
+                                                    }
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var row in table.Rows)
+                                                {
+                                                    <tr>
+                                                        @for (var c = 0; c < table.Headers.Count; c++)
+                                                        {
+                                                            var cell = c < row.Count ? row[c] : new MappingViewer.Web.Models.CellData();
+                                                            <td class="@CellDisplayClass(cell)"
+                                                                data-col-idx="@c"
+                                                                style="@CellStyle(cell)"
+                                                                data-full-text="@cell.Value">@cell.Value</td>
+                                                        }
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                            <tfoot>
+                                                <tr>
+                                                    <td colspan="@table.Headers.Count" class="data-table__footer">
+                                                        Showing <span class="row-visible">@table.Rows.Count</span>
+                                                        of <span class="row-total">@table.Rows.Count</span> rows
+                                                    </td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</section>
+
+<div id="tableExpandModal" class="table-expand-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="tableExpandTitle">
+    <div class="table-expand-modal__backdrop" data-close-table-expand></div>
+    <div class="table-expand-modal__panel">
+        <div class="table-expand-modal__header">
+            <h2 id="tableExpandTitle" class="table-expand-modal__title">Table</h2>
+            <div class="table-expand-modal__controls">
+                <input id="tableExpandSearch" class="table-expand-modal__search" type="search"
+                       placeholder="Search in this table…" autocomplete="off" />
+                <label class="case-toggle table-expand-modal__case">
+                    <input id="tableExpandCase" type="checkbox" />
+                    <span>Case sensitive</span>
+                </label>
+                <button type="button" class="btn-tool btn-tool--icon" data-close-table-expand aria-label="Close">&times;</button>
+            </div>
+        </div>
+        <div id="tableExpandBody" class="table-expand-modal__body"></div>
+    </div>
+</div>
+
+<div id="cellPopup" class="cell-popup is-hidden" role="dialog" aria-modal="true" aria-labelledby="cellPopupTitle">
+    <div class="cell-popup__backdrop" data-close-popup></div>
+    <div class="cell-popup__panel">
+        <div class="cell-popup__header">
+            <h2 id="cellPopupTitle" class="cell-popup__title">Cell value</h2>
+            <button type="button" class="cell-popup__close" data-close-popup aria-label="Close">&times;</button>
+        </div>
+        <pre id="cellPopupContent" class="cell-popup__content"></pre>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/table-grid.js" asp-append-version="true"></script>
+    <script src="~/js/viewer.js" asp-append-version="true"></script>
+}

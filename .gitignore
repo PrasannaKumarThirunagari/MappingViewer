@@ -1,0 +1,38 @@
+## Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Visual Studio / VS Code / Rider
+.vs/
+.vscode/
+.idea/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+*.rsuser
+
+## .NET
+project.lock.json
+project.fragment.lock.json
+artifacts/
+*.nuget.props
+*.nuget.targets
+
+## ASP.NET Core
+appsettings.*.local.json
+secrets.json
+
+## Excel (temp/lock files while open in Excel)
+~$*
+
+## OS
+.DS_Store
+Thumbs.db
+[Dd]esktop.ini
+
+## Editor / tooling
+*.swp
+*~

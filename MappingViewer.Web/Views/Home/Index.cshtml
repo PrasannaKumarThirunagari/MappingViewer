@@ -1,0 +1,34 @@
+@model List<string>
+@{
+    ViewData["Title"] = "Workbooks";
+}
+
+<section class="page">
+    <h1>Excel workbooks</h1>
+    <p class="muted">
+        Folder: <code>@ViewBag.FolderPath</code>
+        — change <code>ExcelSettings:FolderPath</code> in <code>appsettings.json</code> to point elsewhere.
+    </p>
+
+    @if (Model.Count == 0)
+    {
+        <div class="empty">
+            <p>No <code>.xlsx</code> files found in the configured folder.</p>
+            <p class="muted">Drop a workbook into the folder above and refresh.</p>
+        </div>
+    }
+    else
+    {
+        <ul class="file-list">
+            @foreach (var f in Model)
+            {
+                <li>
+                    <a asp-action="Viewer" asp-route-file="@f" class="file-list__item">
+                        <span class="file-list__icon">XLSX</span>
+                        <span class="file-list__name">@f</span>
+                    </a>
+                </li>
+            }
+        </ul>
+    }
+</section>

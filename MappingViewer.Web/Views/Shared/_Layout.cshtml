@@ -1,0 +1,35 @@
+@{
+    var isViewer = ViewData["ViewerLayout"] as bool? == true;
+}
+<!DOCTYPE html>
+<html lang="en" class="@(isViewer ? "viewer-mode" : "")">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Mapping Viewer</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="@(isViewer ? "viewer-mode" : "")">
+    <header class="app-header @(isViewer ? "app-header--compact" : "")">
+        <div class="app-header__inner @(isViewer ? "app-header__inner--full" : "")">
+            <a class="app-header__brand" asp-controller="Home" asp-action="Index">Mapping Viewer</a>
+            @if (!isViewer)
+            {
+                <nav class="app-header__nav">
+                    <a asp-controller="Home" asp-action="Index">Workbooks</a>
+                </nav>
+            }
+        </div>
+    </header>
+
+    <main class="app-main @(isViewer ? "app-main--viewer" : "")">
+        @if (TempData["Error"] is string err)
+        {
+            <div class="alert alert--error">@err</div>
+        }
+        @RenderBody()
+    </main>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
