@@ -177,12 +177,165 @@ body.viewer-mode {
     background: var(--panel);
 }
 
+/* ---- Body: left sheet sidebar + workspace ---- */
+.viewer-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: row;
+    background: var(--bg);
+}
+
+.viewer-sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    min-height: 0;
+}
+
+.viewer-sidebar__header {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #ffffff, #f8fafc);
+    flex-shrink: 0;
+}
+
+.viewer-sidebar__search {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    background: #ffffff;
+    color: var(--text);
+    transition: border-color 0.12s, box-shadow 0.12s;
+}
+.viewer-sidebar__search::placeholder { color: #98a2b3; }
+.viewer-sidebar__search:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.viewer-sidebar__list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 6px 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.viewer-sidebar__list::-webkit-scrollbar { width: 8px; }
+.viewer-sidebar__list::-webkit-scrollbar-thumb {
+    background: #c2cad6;
+    border-radius: 6px;
+    border: 2px solid var(--panel);
+}
+.viewer-sidebar__list::-webkit-scrollbar-thumb:hover { background: #9aa6b6; }
+
+.viewer-sidebar__empty {
+    padding: 14px 14px 18px;
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+}
+
+.sheet-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.sheet-link:hover {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.sheet-link--active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: rgba(37, 99, 235, 0.25);
+    font-weight: 600;
+}
+
+.sheet-link.is-hidden { display: none; }
+
+.sheet-link__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.sheet-link__count {
+    flex-shrink: 0;
+    background: var(--border);
+    color: var(--muted);
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.sheet-link:hover .sheet-link__count,
+.sheet-link--active .sheet-link__count {
+    background: var(--accent);
+    color: white;
+}
+
 .viewer-workspace {
     flex: 1;
+    min-width: 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
     background: var(--bg);
+}
+
+/* Reload button visual when triggered */
+.viewer-toolbar__reload {
+    flex-shrink: 0;
+}
+.viewer-toolbar__reload.is-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+.viewer-toolbar__reload.is-loading .btn-tool__icon {
+    display: inline-block;
+    animation: viewer-spin 0.7s linear infinite;
+}
+
+@keyframes viewer-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@media (max-width: 720px) {
+    .viewer-body { flex-direction: column; }
+    .viewer-sidebar {
+        width: 100%;
+        max-height: 38vh;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+    }
 }
 
 .viewer-page__empty {
@@ -217,11 +370,12 @@ body.viewer-mode {
 .tables-stack {
     flex: 1;
     min-height: 0;
-    overflow: auto;
-    padding: 6px 8px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px 10px 12px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
 }
 
 .page h1 { margin: 0 0 4px; font-size: 22px; }
@@ -355,13 +509,18 @@ body.viewer-mode {
 /* Table block (one logical table inside a sheet) */
 .table-block {
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 8px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
-    min-height: 200px;
-    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    min-height: 220px;
+    /* Constrain block height so .table-scroll becomes the real vertical
+       scroller — this is what makes the sticky <thead> actually stick.
+       App header (~41px) + toolbar (~44px) + paddings ≈ 130px. */
+    max-height: calc(100vh - 130px);
+    background: var(--panel);
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 1px rgba(16, 24, 40, 0.03);
 }
 
 .table-block__bar {
@@ -369,8 +528,8 @@ body.viewer-mode {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 8px 12px;
-    background: var(--panel);
+    padding: 9px 14px;
+    background: linear-gradient(180deg, #ffffff, #f8fafc);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
 }
@@ -382,6 +541,7 @@ body.viewer-mode {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    letter-spacing: 0.01em;
 }
 
 .table-block__actions {
@@ -428,13 +588,25 @@ body.viewer-mode {
     margin-bottom: 6px;
 }
 
-/* Scroll container — vertical AND horizontal */
+/* Scroll container — vertical AND horizontal.
+   This is the scrolling ancestor that .data-table thead sticks to. */
 .table-scroll {
     overflow: auto;
-    flex: 1;
-    min-height: 120px;
+    flex: 1 1 auto;
+    min-height: 0;
     -webkit-overflow-scrolling: touch;
+    scrollbar-color: #c2cad6 transparent;
+    scrollbar-width: thin;
 }
+
+.table-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.table-scroll::-webkit-scrollbar-thumb {
+    background: #c2cad6;
+    border-radius: 6px;
+    border: 2px solid #ffffff;
+}
+.table-scroll::-webkit-scrollbar-thumb:hover { background: #9aa6b6; }
+.table-scroll::-webkit-scrollbar-track { background: transparent; }
 
 /* Data table */
 .data-table {
@@ -444,13 +616,18 @@ body.viewer-mode {
     width: max-content;
     min-width: 100%;
     table-layout: fixed;
+    background: var(--panel);
 }
 
+/* Fixed header row height — keeps the sticky filter row offset predictable */
+.data-table__headers th { height: 40px; }
+.data-table__filters th { height: 36px; }
+
 .data-table__th {
-    background: #eef1f6;
+    background: linear-gradient(180deg, #f3f6fb 0%, #e7ecf3 100%);
     text-align: left;
     padding: 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid #cfd6df;
     border-right: 1px solid #d8dee6;
     position: sticky;
     top: 0;
@@ -458,12 +635,11 @@ body.viewer-mode {
     font-weight: 600;
     vertical-align: middle;
     cursor: grab;
-    min-width: 72px;
+    min-width: 96px;
+    box-shadow: inset 0 -1px 0 #cfd6df;
 }
 
-.data-table__th:active {
-    cursor: grabbing;
-}
+.data-table__th:active { cursor: grabbing; }
 
 .data-table__th.th--dragging {
     opacity: 0.55;
@@ -476,14 +652,18 @@ body.viewer-mode {
 
 .th-label {
     display: block;
-    padding: 8px 14px 8px 10px;
+    padding: 10px 18px 10px 12px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 12.5px;
+    color: #2d3a4b;
+    letter-spacing: 0.02em;
 }
 
 .data-table thead th.cell-display {
     max-width: none;
+    white-space: nowrap;
 }
 
 .data-table__th:last-child,
@@ -492,20 +672,19 @@ body.viewer-mode {
 }
 
 .data-table__filter-th {
-    top: 38px;
-    background: #f8f9fb;
-    padding: 4px 6px;
+    top: 40px; /* matches header row height */
+    background: #f5f7fa;
+    padding: 5px 6px;
     font-weight: normal;
     z-index: 2;
     position: sticky;
-    border-bottom: 1px solid var(--border);
-    border-right: 1px solid #e8ebef;
-    min-width: 72px;
+    border-bottom: 1px solid #d8dee6;
+    border-right: 1px solid #e3e7ec;
+    min-width: 96px;
+    vertical-align: middle;
 }
 
-.data-table--resizing {
-    user-select: none;
-}
+.data-table--resizing { user-select: none; }
 
 .col-resize-handle {
     position: absolute;
@@ -518,66 +697,86 @@ body.viewer-mode {
 }
 
 .col-resize-handle:hover {
-    background: rgba(37, 99, 235, 0.15);
+    background: rgba(37, 99, 235, 0.18);
 }
 
 .col-filter {
     width: 100%;
-    min-width: 90px;
-    padding: 4px 6px;
-    border: 1px solid var(--border);
-    border-radius: 3px;
+    min-width: 80px;
+    padding: 5px 8px;
+    border: 1px solid #cfd6df;
+    border-radius: 4px;
     font-size: 12px;
-    background: white;
+    background: #ffffff;
+    color: var(--text);
+    transition: border-color 0.12s, box-shadow 0.12s;
 }
-.col-filter:focus { outline: none; border-color: var(--accent); }
+.col-filter::placeholder { color: #98a2b3; }
+.col-filter:hover { border-color: #aab4c2; }
+.col-filter:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+    background: #ffffff;
+}
 
-/* Preserve Excel spacing/indent; clip in grid, full text in popup */
+/* Cells preserve original Excel formatting exactly — whitespace, indents,
+   line breaks, list numbering, ordering — by wrapping with pre-wrap and
+   never collapsing whitespace. */
 .cell-display {
-    white-space: pre;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: pre-wrap;
+    word-break: normal;
+    overflow-wrap: anywhere;
     vertical-align: top;
+    tab-size: 4;
 }
 
-.data-table:not(.data-table--expanded) tbody .cell-display,
-.data-table:not(.data-table--expanded) thead .cell-display {
-    max-width: 320px;
+.data-table:not(.data-table--expanded) tbody .cell-display {
+    max-width: 520px;
 }
 
-.data-table--expanded .cell-display {
-    max-width: none;
-}
+.data-table--expanded .cell-display { max-width: none; }
+
+/* Legacy class kept for backward compatibility — now equivalent to base */
 .cell-display--wrap {
     white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 4.5em;
+    word-break: normal;
+    overflow-wrap: anywhere;
 }
-.cell-display--truncated {
-    cursor: pointer;
-}
+
+.cell-display--truncated { cursor: pointer; }
 .cell-display--truncated:hover {
     box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .data-table tbody td {
-    padding: 7px 10px;
-    border-bottom: 1px solid #edf0f3;
-    border-right: 1px solid #f0f1f3;
-    line-height: 1.35;
+    padding: 9px 14px;
+    border-bottom: 1px solid #eef1f5;
+    border-right: 1px solid #f2f4f7;
+    line-height: 1.5;
+    color: var(--text);
+    vertical-align: top;
 }
 .data-table tbody td:last-child { border-right: none; }
-.data-table tbody tr:nth-child(even) td:not([style*="background-color"]) { background: var(--row-alt); }
-.data-table tbody tr:hover td:not([style*="background-color"]) { background: var(--row-hover); }
+.data-table tbody tr:nth-child(even) td:not([style*="background-color"]) { background: #fafbfd; }
+.data-table tbody tr:hover td:not([style*="background-color"]) { background: #eef4ff; }
+.data-table tbody tr:last-child td { border-bottom: none; }
 
 .data-table__footer {
-    padding: 8px 12px !important;
-    background: #f4f6f9 !important;
+    padding: 9px 14px !important;
+    background: #f5f7fa !important;
     color: var(--muted);
     font-size: 12px;
     position: sticky;
     bottom: 0;
     white-space: normal !important;
+    border-top: 1px solid #e3e7ec;
+    z-index: 2;
+}
+.data-table__footer .row-visible,
+.data-table__footer .row-total {
+    font-weight: 600;
+    color: var(--text);
 }
 
 /* Full cell value popup */

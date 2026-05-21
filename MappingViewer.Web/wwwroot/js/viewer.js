@@ -122,11 +122,11 @@
 
     function activateTab(tabBtn) {
         var targetId = tabBtn.getAttribute('data-sheet-target');
-        document.querySelectorAll('.tab').forEach(function (t) {
-            t.classList.remove('tab--active');
+        document.querySelectorAll('.sheet-link').forEach(function (t) {
+            t.classList.remove('sheet-link--active');
             t.setAttribute('aria-selected', 'false');
         });
-        tabBtn.classList.add('tab--active');
+        tabBtn.classList.add('sheet-link--active');
         tabBtn.setAttribute('aria-selected', 'true');
 
         document.querySelectorAll('.sheet-panel').forEach(function (p) {
@@ -136,6 +136,19 @@
         applyAllFilters();
         markTruncatedCells();
         syncDescriptionToggleVisibility();
+    }
+
+    function filterSheetList(term) {
+        var normalized = (term || '').trim().toLowerCase();
+        var anyVisible = false;
+        document.querySelectorAll('.viewer-sidebar .sheet-link').forEach(function (btn) {
+            var name = (btn.getAttribute('data-sheet-name') || btn.textContent || '').toLowerCase();
+            var match = !normalized || name.indexOf(normalized) !== -1;
+            btn.classList.toggle('is-hidden', !match);
+            if (match) anyVisible = true;
+        });
+        var emptyEl = document.getElementById('sheetSearchEmpty');
+        if (emptyEl) emptyEl.classList.toggle('is-hidden', anyVisible);
     }
 
     function syncDescriptionToggleVisibility() {
@@ -292,8 +305,9 @@
         var showDescription = document.getElementById('showDescription');
         var descKey = 'mappingViewer.showDescription';
         if (showDescription) {
+            // Default: hidden. Only show when the user has explicitly opted in.
             var saved = localStorage.getItem(descKey);
-            if (saved === 'false') showDescription.checked = false;
+            showDescription.checked = (saved === 'true');
             applyDescriptionVisibility(showDescription.checked);
             showDescription.addEventListener('change', function () {
                 localStorage.setItem(descKey, showDescription.checked ? 'true' : 'false');
@@ -303,9 +317,37 @@
             syncDescriptionToggleVisibility();
         }
 
-        document.querySelectorAll('.tab').forEach(function (btn) {
+        document.querySelectorAll('.sheet-link').forEach(function (btn) {
             btn.addEventListener('click', function () { activateTab(btn); });
         });
+
+        var sheetSearch = document.getElementById('sheetSearch');
+        if (sheetSearch) {
+            sheetSearch.addEventListener('input', function () {
+                filterSheetList(sheetSearch.value);
+            });
+            // Esc clears the filter
+            sheetSearch.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && sheetSearch.value) {
+                    sheetSearch.value = '';
+                    filterSheetList('');
+                    e.stopPropagation();
+                }
+            });
+        }
+
+        var reloadBtn = document.getElementById('reloadWorkbook');
+        if (reloadBtn) {
+            reloadBtn.addEventListener('click', function () {
+                reloadBtn.disabled = true;
+                reloadBtn.classList.add('is-loading');
+                // Cache-bust so any intermediate proxy / browser cache is bypassed.
+                // The controller re-reads the workbook from disk on every request.
+                var url = new URL(window.location.href);
+                url.searchParams.set('_t', Date.now().toString());
+                window.location.replace(url.toString());
+            });
+        }
 
         var globalInput = document.getElementById('globalSearch');
         if (globalInput) {

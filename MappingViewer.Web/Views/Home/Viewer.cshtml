@@ -53,23 +53,21 @@
                 }
             }
         </select>
-
-        <span class="viewer-toolbar__filename" title="@Model.FileName">@Model.FileName</span>
-        <span class="viewer-toolbar__meta">@Model.Sheets.Count sheet(s)</span>
-
+        <div class="viewer-toolbar__spacer"></div>
         <label class="description-toggle viewer-toolbar__toggle">
-            <input id="showDescription" type="checkbox" checked />
+            <input id="showDescription" type="checkbox" />
             <span>Show description</span>
         </label>
-
-        <div class="viewer-toolbar__spacer"></div>
-
         <input id="globalSearch" class="viewer-toolbar__search" type="search"
                placeholder="Filter all columns…" autocomplete="off" />
         <label class="case-toggle viewer-toolbar__case">
             <input id="caseSensitive" type="checkbox" />
             <span>Case sensitive</span>
         </label>
+        <button id="reloadWorkbook" type="button" class="btn-tool viewer-toolbar__reload" title="Reload workbook from disk">
+            <span class="btn-tool__icon" aria-hidden="true">↻</span>
+            <span>Reload</span>
+        </button>
     </div>
 
     @if (Model.Sheets.Count == 0)
@@ -78,23 +76,34 @@
     }
     else
     {
-        <div class="viewer-tabs" role="tablist">
-            @for (var i = 0; i < Model.Sheets.Count; i++)
-            {
-                var sheet = Model.Sheets[i];
-                var active = i == 0 ? "tab--active" : "";
-                var totalRows = sheet.Tables.Sum(t => t.Rows.Count);
-                <button type="button" role="tab"
-                        class="tab @active"
-                        data-sheet-target="sheet-@i"
-                        aria-selected="@(i == 0 ? "true" : "false")">
-                    @sheet.Name
-                    <span class="tab__count">@totalRows</span>
-                </button>
-            }
-        </div>
+        <div class="viewer-body">
+            <aside class="viewer-sidebar" aria-label="Sheets">
+                <div class="viewer-sidebar__header">
+                    <label class="visually-hidden" for="sheetSearch">Search sheets</label>
+                    <input id="sheetSearch" type="search" class="viewer-sidebar__search"
+                           placeholder="Search sheets…" autocomplete="off" />
+                </div>
+                <nav class="viewer-sidebar__list" role="tablist" aria-label="Workbook sheets">
+                    @for (var i = 0; i < Model.Sheets.Count; i++)
+                    {
+                        var sheet = Model.Sheets[i];
+                        var active = i == 0 ? "sheet-link--active" : "";
+                        var totalRows = sheet.Tables.Sum(t => t.Rows.Count);
+                        <button type="button" role="tab"
+                                class="sheet-link @active"
+                                data-sheet-target="sheet-@i"
+                                data-sheet-name="@sheet.Name"
+                                aria-selected="@(i == 0 ? "true" : "false")"
+                                title="@sheet.Name">
+                            <span class="sheet-link__name">@sheet.Name</span>
+                            <span class="sheet-link__count">@totalRows</span>
+                        </button>
+                    }
+                </nav>
+                <p id="sheetSearchEmpty" class="viewer-sidebar__empty is-hidden">No sheets match.</p>
+            </aside>
 
-        <div class="viewer-workspace">
+            <div class="viewer-workspace">
             @for (var i = 0; i < Model.Sheets.Count; i++)
             {
                 var sheet = Model.Sheets[i];
@@ -261,6 +270,7 @@
                     </div>
                 </div>
             }
+            </div>
         </div>
     }
 </section>
