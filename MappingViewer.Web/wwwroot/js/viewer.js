@@ -120,14 +120,18 @@
         });
     }
 
-    function activateTab(tabBtn) {
-        var targetId = tabBtn.getAttribute('data-sheet-target');
+    function setSheetLinkActive(btn) {
         document.querySelectorAll('.sheet-link').forEach(function (t) {
             t.classList.remove('sheet-link--active');
             t.setAttribute('aria-selected', 'false');
         });
-        tabBtn.classList.add('sheet-link--active');
-        tabBtn.setAttribute('aria-selected', 'true');
+        btn.classList.add('sheet-link--active');
+        btn.setAttribute('aria-selected', 'true');
+    }
+
+    function activateTab(tabBtn) {
+        var targetId = tabBtn.getAttribute('data-sheet-target');
+        setSheetLinkActive(tabBtn);
 
         document.querySelectorAll('.sheet-panel').forEach(function (p) {
             p.classList.toggle('is-hidden', p.id !== targetId);
@@ -200,6 +204,27 @@
         });
     }
 
+    function handleRowSelection(bodyRow, e) {
+        if (bodyRow.style.display === 'none') return;
+        var table = bodyRow.closest('table.data-table');
+        if (!table) return;
+
+        var multi = e.ctrlKey || e.metaKey;
+        if (multi) {
+            bodyRow.classList.toggle('row-selected');
+            return;
+        }
+
+        // Normal click: select this row and clear others in the same table only.
+        // Re-clicking the same row keeps it selected (sticky until another row is chosen).
+        if (table) {
+            table.querySelectorAll('tbody tr.row-selected').forEach(function (r) {
+                if (r !== bodyRow) r.classList.remove('row-selected');
+            });
+        }
+        bodyRow.classList.add('row-selected');
+    }
+
     function bindColFilters(root) {
         (root || document).querySelectorAll('.col-filter').forEach(function (input) {
             if (input.dataset.bound === '1') return;
@@ -254,12 +279,23 @@
 
         document.addEventListener('click', function (e) {
             if (e.target.closest('.col-resize-handle') || e.target.closest('[data-expand-table]') ||
-                e.target.closest('[data-reset-columns]')) {
+                e.target.closest('[data-reset-columns]') || e.target.closest('.col-filter') ||
+                e.target.closest('.sheet-link') || e.target.closest('.viewer-toolbar') ||
+                e.target.closest('.viewer-sidebar__header') || e.target.closest('.table-block__actions') ||
+                e.target.closest('.table-expand-modal') || e.target.closest('.cell-popup')) {
                 return;
             }
-            var cell = e.target.closest('.cell-display--truncated');
-            if (!cell) return;
-            openCellPopup(cellFullText(cell));
+
+            var truncatedCell = e.target.closest('.cell-display--truncated');
+            if (truncatedCell) {
+                openCellPopup(cellFullText(truncatedCell));
+                return;
+            }
+
+            var bodyRow = e.target.closest('.data-table tbody tr.data-row');
+            if (bodyRow) {
+                handleRowSelection(bodyRow, e);
+            }
         });
 
         document.addEventListener('click', function (e) {

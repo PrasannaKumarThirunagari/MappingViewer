@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Globalization;
 using MappingViewer.Web.Models;
 using Microsoft.Extensions.Options;
 using OfficeOpenXml;
@@ -8,6 +10,8 @@ namespace MappingViewer.Web.Services;
 /// <summary>
 /// Reads .xlsx workbooks from a configured folder using EPPlus.
 /// Table layout is driven entirely by <see cref="TableDetectionSettings"/> (no hardcoded rows/columns).
+/// Optimized for large workbooks: bulk value reads, per-styleId style decoding,
+/// and an in-memory cache keyed by (file path, last-write time).
 /// </summary>
 public class ExcelReaderService : IExcelReaderService
 {
@@ -16,6 +20,26 @@ public class ExcelReaderService : IExcelReaderService
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<ExcelReaderService> _logger;
     private readonly HashSet<string> _neutralColors;
+
+    // Cache parsed workbooks. Key = absolute path. Entry is invalidated when the file's
+    // last-write time changes, so the user always sees the on-disk content.
+    private readonly ConcurrentDictionary<string, CachedWorkbook> _cache = new(StringComparer.OrdinalIgnoreCase);
+
+    private sealed class CachedWorkbook
+    {
+        public required DateTime LastWriteUtc { get; init; }
+        public required long Length { get; init; }
+        public required WorkbookData Data { get; init; }
+    }
+
+    /// <summary>Compact bundle of style fields we actually care about.</summary>
+    private readonly record struct DecodedStyle(
+        string? Background,
+        string? FontColor,
+        bool Bold,
+        int Indent,
+        bool WrapText,
+        string? HorizontalAlignment);
 
     public ExcelReaderService(
         IOptions<ExcelSettings> settings,
@@ -110,10 +134,19 @@ public class ExcelReaderService : IExcelReaderService
         }
 
         var full = Path.Combine(GetFolderPath(), safeName);
-        if (!File.Exists(full))
+        var info = new FileInfo(full);
+        if (!info.Exists)
         {
             _logger.LogWarning("Workbook not found: {Path}", full);
             return null;
+        }
+
+        // Serve cached parse if the file hasn't changed since we last read it.
+        if (_cache.TryGetValue(full, out var cached)
+            && cached.LastWriteUtc == info.LastWriteTimeUtc
+            && cached.Length == info.Length)
+        {
+            return cached.Data;
         }
 
         try
@@ -127,6 +160,13 @@ public class ExcelReaderService : IExcelReaderService
             {
                 workbook.Sheets.Add(ParseSheet(ws));
             }
+
+            _cache[full] = new CachedWorkbook
+            {
+                LastWriteUtc = info.LastWriteTimeUtc,
+                Length = info.Length,
+                Data = workbook
+            };
 
             return workbook;
         }
@@ -252,6 +292,15 @@ public class ExcelReaderService : IExcelReaderService
         return sheet;
     }
 
+    /// <summary>
+    /// Build every row of a worksheet in one fast pass:
+    ///   * Bulk-read all values via <see cref="ExcelRange.Value"/> as an <c>object[,]</c>
+    ///     (single internal traversal instead of one ExcelRange allocation per cell).
+    ///   * Decode each unique styleId once and cache the result (most workbooks reuse
+    ///     a handful of style ids across thousands of cells).
+    ///   * Only call the slow <see cref="ExcelRange.Text"/> formatter for numeric/date
+    ///     cells (strings are the common case and need no formatting).
+    /// </summary>
     private Dictionary<int, SheetRowSnapshot> BuildRowCache(
         ExcelWorksheet ws,
         int rowCount,
@@ -259,46 +308,116 @@ public class ExcelReaderService : IExcelReaderService
         SheetTableDetector detector)
     {
         var cache = new Dictionary<int, SheetRowSnapshot>(rowCount);
+
+        // One pass: bulk fetch every value. EPPlus returns a 1-based jagged storage
+        // surfaced as object[,] when the address is a multi-cell range.
+        object[,]? values = null;
+        if (rowCount > 0 && colCount > 0)
+        {
+            var rangeValue = ws.Cells[1, 1, rowCount, colCount].Value;
+            values = rangeValue as object[,];
+        }
+
+        // Decode each styleId only once — typically tens of unique styles across the sheet.
+        var styleCache = new Dictionary<int, DecodedStyle>(64);
+
         for (int r = 1; r <= rowCount; r++)
         {
-            var cells = ReadRow(ws, r, colCount);
-            cache[r] = SheetTableDetector.AnalyzeRow(cells, r);
+            var list = new List<CellData>(colCount);
+            for (int c = 1; c <= colCount; c++)
+            {
+                var raw = values != null ? values[r - 1, c - 1] : ws.GetValue(r, c);
+                string text;
+                if (raw is null)
+                {
+                    text = string.Empty;
+                }
+                else if (raw is string s)
+                {
+                    text = s;
+                }
+                else
+                {
+                    // Numbers and dates: defer to EPPlus' formatter so we keep display
+                    // fidelity (number formats, dates) — only the rare non-string cell pays.
+                    text = ws.Cells[r, c].Text;
+                    if (string.IsNullOrEmpty(text))
+                    {
+                        text = Convert.ToString(raw, CultureInfo.InvariantCulture) ?? string.Empty;
+                    }
+                }
+
+                var styleId = ws.Cells[r, c].StyleID;
+                if (!styleCache.TryGetValue(styleId, out var style))
+                {
+                    style = DecodeStyle(ws, r, c);
+                    styleCache[styleId] = style;
+                }
+
+                list.Add(new CellData
+                {
+                    Value = text,
+                    BackgroundColor = style.Background,
+                    FontColor = style.FontColor,
+                    Bold = style.Bold,
+                    Indent = style.Indent,
+                    WrapText = style.WrapText,
+                    HorizontalAlignment = style.HorizontalAlignment
+                });
+            }
+            cache[r] = SheetTableDetector.AnalyzeRow(list, r);
         }
         return cache;
     }
 
+    /// <summary>
+    /// Decode the style fields we care about for one cell. Called at most once per
+    /// unique styleId in a sheet — subsequent cells sharing that style reuse the result.
+    /// </summary>
+    private DecodedStyle DecodeStyle(ExcelWorksheet ws, int row, int col)
+    {
+        var s = ws.Cells[row, col].Style;
+
+        string? bg = null;
+        if (s.Fill.PatternType != ExcelFillStyle.None)
+        {
+            bg = ResolveColorValue(s.Fill.BackgroundColor)
+                 ?? ResolveColorValue(s.Fill.PatternColor);
+            bg = NeutralizeDisplayColor(bg);
+        }
+
+        string? fontColor = ResolveColorValue(s.Font.Color);
+        bool bold = s.Font.Bold;
+        int indent = s.Indent;
+        bool wrap = s.WrapText;
+        string hAlign = s.HorizontalAlignment.ToString();
+
+        return new DecodedStyle(bg, fontColor, bold, indent, wrap, hAlign);
+    }
+
+    private static string? ResolveColorValue(ExcelColor color)
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(color.Rgb))
+            {
+                return ToSafeHex(color.Rgb);
+            }
+            var looked = color.LookupColor();
+            if (!string.IsNullOrEmpty(looked) && looked != "#")
+            {
+                return ToSafeHex(looked);
+            }
+        }
+        catch
+        {
+            // EPPlus can throw on missing theme info — treat as no color.
+        }
+        return null;
+    }
+
     private string? NeutralizeDisplayColor(string? hex) =>
         hex != null && IsNeutralDisplayColor(hex) ? null : hex;
-
-    private static string GetCellDisplayText(ExcelRange cell)
-    {
-        if (!string.IsNullOrEmpty(cell.Text))
-        {
-            return cell.Text;
-        }
-
-        return cell.Value?.ToString() ?? string.Empty;
-    }
-
-    private List<CellData> ReadRow(ExcelWorksheet ws, int row, int colCount)
-    {
-        var list = new List<CellData>(colCount);
-        for (int c = 1; c <= colCount; c++)
-        {
-            var cell = ws.Cells[row, c];
-            list.Add(new CellData
-            {
-                Value = GetCellDisplayText(cell),
-                BackgroundColor = NeutralizeDisplayColor(ResolveColor(cell.Style.Fill)),
-                FontColor = ResolveFontColor(cell.Style.Font.Color),
-                Bold = cell.Style.Font.Bold,
-                Indent = cell.Style.Indent,
-                WrapText = cell.Style.WrapText,
-                HorizontalAlignment = cell.Style.HorizontalAlignment.ToString()
-            });
-        }
-        return list;
-    }
 
     private static List<CellData> TrimTrailingBlanks(List<CellData> cells)
     {
@@ -313,37 +432,6 @@ public class ExcelReaderService : IExcelReaderService
             else break;
         }
         return trimmed;
-    }
-
-    private static string? ResolveColor(ExcelFill fill)
-    {
-        if (fill.PatternType == ExcelFillStyle.None) return null;
-        return ResolveExcelColor(fill.BackgroundColor)
-               ?? ResolveExcelColor(fill.PatternColor);
-    }
-
-    private static string? ResolveFontColor(ExcelColor color) => ResolveExcelColor(color);
-
-    private static string? ResolveExcelColor(ExcelColor color)
-    {
-        try
-        {
-            if (!string.IsNullOrEmpty(color.Rgb))
-            {
-                return ToSafeHex(color.Rgb);
-            }
-
-            var looked = color.LookupColor();
-            if (!string.IsNullOrEmpty(looked) && looked != "#")
-            {
-                return ToSafeHex(looked);
-            }
-        }
-        catch
-        {
-            // EPPlus can throw on missing theme info; treat as no color.
-        }
-        return null;
     }
 
     public static string NormalizeHex(string hex)

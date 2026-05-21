@@ -7,22 +7,28 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Mapping Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
-<body class="@(isViewer ? "viewer-mode" : "")">
-    <header class="app-header @(isViewer ? "app-header--compact" : "")">
-        <div class="app-header__inner @(isViewer ? "app-header__inner--full" : "")">
-            <a class="app-header__brand" asp-controller="Home" asp-action="Index">Mapping Viewer</a>
+<body class="@(isViewer ? "viewer-mode bg-slate-50" : "bg-slate-50")">
+    <header class="app-header @(isViewer ? "app-header--compact shrink-0" : "") bg-slate-50 border-b border-slate-100 z-10">
+        <div class="app-header__inner @(isViewer ? "app-header__inner--full max-w-none" : "") flex items-center justify-between gap-4 px-4 sm:px-6 h-14">
+            <a class="app-header__brand inline-flex items-center gap-2.5 text-slate-800 font-semibold text-base hover:no-underline"
+               asp-controller="Home" asp-action="Index">
+                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold shadow-sm">M</span>
+                <span>Mapping Viewer</span>
+            </a>
             @if (!isViewer)
             {
-                <nav class="app-header__nav">
-                    <a asp-controller="Home" asp-action="Index">Workbooks</a>
+                <nav class="app-header__nav flex items-center gap-1">
+                    <a class="px-3 py-1.5 rounded-md text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors"
+                       asp-controller="Home" asp-action="Index">Workbooks</a>
                 </nav>
             }
         </div>
     </header>
 
-    <main class="app-main @(isViewer ? "app-main--viewer" : "")">
+    <main class="app-main @(isViewer ? "app-main--viewer" : "app-main--home")">
         @if (TempData["Error"] is string err)
         {
             <div class="alert alert--error">@err</div>

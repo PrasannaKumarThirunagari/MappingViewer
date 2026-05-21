@@ -37,131 +37,119 @@
     }
 }
 
-<section class="viewer-page">
-    <div class="viewer-toolbar">
-        <label class="viewer-toolbar__label visually-hidden" for="workbookSelect">Workbook</label>
-        <select id="workbookSelect" class="workbook-select" aria-label="Select workbook">
-            @foreach (var f in workbookFiles)
-            {
-                if (string.Equals(f, currentFile, StringComparison.OrdinalIgnoreCase))
-                {
-                    <option value="@f" selected="selected">@f</option>
-                }
-                else
-                {
-                    <option value="@f">@f</option>
-                }
-            }
-        </select>
-        <div class="viewer-toolbar__spacer"></div>
-        <label class="description-toggle viewer-toolbar__toggle">
-            <input id="showDescription" type="checkbox" />
-            <span>Show description</span>
-        </label>
-        <input id="globalSearch" class="viewer-toolbar__search" type="search"
-               placeholder="Filter all columns…" autocomplete="off" />
-        <label class="case-toggle viewer-toolbar__case">
-            <input id="caseSensitive" type="checkbox" />
-            <span>Case sensitive</span>
-        </label>
-        <button id="reloadWorkbook" type="button" class="btn-tool viewer-toolbar__reload" title="Reload workbook from disk">
-            <span class="btn-tool__icon" aria-hidden="true">↻</span>
-            <span>Reload</span>
-        </button>
-    </div>
-
+<section class="viewer-page flex flex-col min-h-0 flex-1 w-full bg-slate-50">
     @if (Model.Sheets.Count == 0)
     {
-        <p class="empty viewer-page__empty">This workbook contains no sheets.</p>
+        <p class="empty viewer-page__empty m-6">This workbook contains no sheets.</p>
     }
     else
     {
-        <div class="viewer-body">
-            <aside class="viewer-sidebar" aria-label="Sheets">
-                <div class="viewer-sidebar__header">
+        <div class="viewer-body flex flex-1 min-h-0 min-w-0">
+            <aside class="viewer-sidebar w-56 shrink-0 flex flex-col bg-slate-50 min-h-0" aria-label="Sheets">
+                <div class="viewer-sidebar__header px-4 pt-5 pb-3">
+                    <div class="flex items-center justify-between gap-2 mb-3">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Sheets</span>
+                        <span class="text-xs text-slate-400">@Model.Sheets.Count</span>
+                    </div>
                     <label class="visually-hidden" for="sheetSearch">Search sheets</label>
-                    <input id="sheetSearch" type="search" class="viewer-sidebar__search"
-                           placeholder="Search sheets…" autocomplete="off" />
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-2.5 text-slate-400 pointer-events-none" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                                <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 3.473 9.768l3.13 3.129a.75.75 0 1 0 1.06-1.06l-3.129-3.13A5.5 5.5 0 0 0 9 3.5ZM5 9a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z" clip-rule="evenodd" />
+                            </svg>
+                        </span>
+                        <input id="sheetSearch" type="search"
+                               class="viewer-sidebar__search w-full pl-8 pr-2 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                               placeholder="Search sheets…" autocomplete="off" />
+                    </div>
                 </div>
-                <nav class="viewer-sidebar__list" role="tablist" aria-label="Workbook sheets">
+                <nav class="viewer-sidebar__list flex-1 min-h-0 overflow-y-auto px-3 py-2 flex flex-col gap-0.5"
+                     role="tablist" aria-label="Workbook sheets">
                     @for (var i = 0; i < Model.Sheets.Count; i++)
                     {
                         var sheet = Model.Sheets[i];
                         var active = i == 0 ? "sheet-link--active" : "";
-                        var totalRows = sheet.Tables.Sum(t => t.Rows.Count);
                         <button type="button" role="tab"
-                                class="sheet-link @active"
+                                class="sheet-link @active w-full px-2 py-2 rounded-md text-sm text-left font-medium transition-colors text-slate-600 hover:text-slate-800"
                                 data-sheet-target="sheet-@i"
                                 data-sheet-name="@sheet.Name"
                                 aria-selected="@(i == 0 ? "true" : "false")"
                                 title="@sheet.Name">
-                            <span class="sheet-link__name">@sheet.Name</span>
-                            <span class="sheet-link__count">@totalRows</span>
+                            <span class="sheet-link__name truncate block">@sheet.Name</span>
                         </button>
                     }
                 </nav>
-                <p id="sheetSearchEmpty" class="viewer-sidebar__empty is-hidden">No sheets match.</p>
+                <p id="sheetSearchEmpty" class="viewer-sidebar__empty is-hidden px-4 py-3 text-center text-xs text-slate-500">No sheets match.</p>
             </aside>
 
-            <div class="viewer-workspace">
+            <div class="viewer-workspace flex-1 min-w-0 min-h-0 flex flex-col p-4 md:p-6">
+            <div class="viewer-content-card flex flex-col flex-1 min-h-0 bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="viewer-toolbar flex items-center gap-2 sm:gap-3 flex-nowrap px-5 py-4 border-b border-slate-100 shrink-0">
+                <h2 class="viewer-toolbar__title text-base font-semibold text-slate-800 truncate mr-2">@Model.FileName</h2>
+                <label class="visually-hidden" for="workbookSelect">Workbook</label>
+                <select id="workbookSelect"
+                        class="workbook-select max-w-[200px] min-w-[120px] shrink-0 px-2.5 py-1.5 text-sm rounded-lg border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        aria-label="Select workbook">
+                    @foreach (var f in workbookFiles)
+                    {
+                        if (string.Equals(f, currentFile, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@f" selected="selected">@f</option>
+                        }
+                        else
+                        {
+                            <option value="@f">@f</option>
+                        }
+                    }
+                </select>
+                <div class="flex-1 min-w-2"></div>
+                <label class="description-toggle inline-flex items-center gap-1.5 shrink-0 text-xs text-slate-500 cursor-pointer select-none whitespace-nowrap">
+                    <input id="showDescription" type="checkbox" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                    <span>Show notes</span>
+                </label>
+                <input id="globalSearch"
+                       class="viewer-toolbar__search w-full max-w-xs min-w-[120px] px-2.5 py-1.5 text-sm rounded-lg border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                       type="search"
+                       placeholder="Filter all columns…" autocomplete="off" />
+                <label class="case-toggle inline-flex items-center gap-1.5 shrink-0 text-xs text-slate-500 cursor-pointer select-none whitespace-nowrap">
+                    <input id="caseSensitive" type="checkbox" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                    <span>Case sensitive</span>
+                </label>
+                <button id="reloadWorkbook" type="button"
+                        class="btn-tool viewer-toolbar__reload inline-flex items-center justify-center w-8 h-8 shrink-0 rounded-full bg-blue-600 text-white border-0 hover:bg-blue-700 transition-colors shadow-sm"
+                        title="Reload workbook from disk">
+                    <span class="btn-tool__icon text-base leading-none" aria-hidden="true">↻</span>
+                    <span class="visually-hidden">Reload</span>
+                </button>
+            </div>
             @for (var i = 0; i < Model.Sheets.Count; i++)
             {
                 var sheet = Model.Sheets[i];
                 var hidden = i == 0 ? "" : "is-hidden";
-                var hasFreeform = sheet.Description.Count > 0
-                    || sheet.Blocks.Any(b => b.FreeformRows != null && b.FreeformRows.Count > 0);
 
                 <div id="sheet-@i" class="sheet-panel @hidden" role="tabpanel" data-sheet-name="@sheet.Name">
 
-                    @if (hasFreeform)
+                    @if (sheet.Description.Count > 0)
                     {
                         <div class="freeform-panel" data-freeform-panel>
-                            @if (sheet.Description.Count > 0)
-                            {
-                                <div class="description-block">
-                                    <div class="description-block__label">Description</div>
-                                    <table class="description-table">
-                                        <tbody>
-                                            @foreach (var row in sheet.Description)
-                                            {
-                                                <tr>
-                                                    @foreach (var cell in row)
-                                                    {
-                                                        <td class="@CellDisplayClass(cell)"
-                                                            style="@CellStyle(cell)"
-                                                            data-full-text="@cell.Value">@cell.Value</td>
-                                                    }
-                                                </tr>
-                                            }
-                                        </tbody>
-                                    </table>
-                                </div>
-                            }
-
-                            @for (var bi = 0; bi < sheet.Blocks.Count; bi++)
-                            {
-                                var block = sheet.Blocks[bi];
-                                @if (block.FreeformRows != null && block.FreeformRows.Count > 0)
-                                {
-                                    <div class="description-block description-block--inline">
-                                        <table class="description-table">
-                                            <tbody>
-                                                @foreach (var row in block.FreeformRows)
+                            <div class="description-block">
+                                <div class="description-block__label">Description</div>
+                                <table class="description-table">
+                                    <tbody>
+                                        @foreach (var row in sheet.Description)
+                                        {
+                                            <tr>
+                                                @foreach (var cell in row)
                                                 {
-                                                    <tr>
-                                                        @foreach (var cell in row)
-                                                        {
-                                                            <td class="@CellDisplayClass(cell)"
-                                                                style="@CellStyle(cell)"
-                                                                data-full-text="@cell.Value">@cell.Value</td>
-                                                        }
-                                                    </tr>
+                                                    <td class="@CellDisplayClass(cell)"
+                                                        style="@CellStyle(cell)"
+                                                        data-full-text="@cell.Value">@cell.Value</td>
                                                 }
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                }
-                            }
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     }
 
@@ -174,6 +162,32 @@
                         @for (var bi = 0; bi < sheet.Blocks.Count; bi++)
                         {
                             var block = sheet.Blocks[bi];
+                            @if (block.FreeformRows != null && block.FreeformRows.Count > 0)
+                            {
+                                // Collapse the few text rows between tables into one UI row.
+                                var noteSegments = block.FreeformRows
+                                    .Select(r => string.Join(" · ",
+                                        r.Where(c => !string.IsNullOrWhiteSpace(c.Value))
+                                         .Select(c => c.Value.Trim())))
+                                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                                    .ToList();
+                                var noteText = string.Join("  •  ", noteSegments);
+                                var noteFullText = string.Join("\n", noteSegments);
+                                @if (noteSegments.Count > 0)
+                                {
+                                    <div class="between-tables-row-wrap" data-between-note data-freeform-panel>
+                                        <table class="between-tables-table w-full border-collapse">
+                                            <tbody>
+                                                <tr>
+                                                    <td class="between-tables-table__cell cell-display"
+                                                        title="@noteFullText"
+                                                        data-full-text="@noteFullText">@noteText</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                            }
                             @if (block.Table != null)
                             {
                                 var table = block.Table;
@@ -217,7 +231,7 @@
                                                     @for (var c = 0; c < table.Headers.Count; c++)
                                                     {
                                                         var h = table.Headers[c];
-                                                        <th class="data-table__th @CellDisplayClass(h)"
+                                                        <th class="data-table__th"
                                                             data-col-idx="@c"
                                                             draggable="true"
                                                             style="@CellStyle(h)"
@@ -240,9 +254,10 @@
                                                 </tr>
                                             </thead>
                                             <tbody>
+                                                @{ var rowIndex = 0; }
                                                 @foreach (var row in table.Rows)
                                                 {
-                                                    <tr>
+                                                    <tr class="data-row" data-row-index="@rowIndex">
                                                         @for (var c = 0; c < table.Headers.Count; c++)
                                                         {
                                                             var cell = c < row.Count ? row[c] : new MappingViewer.Web.Models.CellData();
@@ -252,6 +267,7 @@
                                                                 data-full-text="@cell.Value">@cell.Value</td>
                                                         }
                                                     </tr>
+                                                    rowIndex++;
                                                 }
                                             </tbody>
                                             <tfoot>
@@ -270,6 +286,7 @@
                     </div>
                 </div>
             }
+            </div>
             </div>
         </div>
     }

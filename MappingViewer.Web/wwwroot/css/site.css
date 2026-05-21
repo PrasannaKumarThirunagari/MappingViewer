@@ -1,13 +1,16 @@
 :root {
-    --bg: #f6f7f9;
+    /* TaxPal-inspired palette */
+    --bg: #f8fafc;
     --panel: #ffffff;
-    --border: #e3e6ea;
-    --text: #1f2933;
-    --muted: #6b7785;
+    --border: #f1f5f9;
+    --border-strong: #e2e8f0;
+    --text: #1e293b;
+    --muted: #64748b;
+    --nav-inactive: #475569;
     --accent: #2563eb;
-    --accent-soft: #eff4ff;
-    --row-alt: #fafbfc;
-    --row-hover: #f1f5fb;
+    --accent-soft: #eff6ff;
+    --row-hover: #f8fafc;
+    --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 * { box-sizing: border-box; }
@@ -36,23 +39,38 @@ code {
     overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
 }
 
-/* Header */
-.app-header { background: var(--panel); border-bottom: 1px solid var(--border); }
+/* Header — same slate-50 as page background (TaxPal style) */
+.app-header {
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+}
 .app-header__inner {
     max-width: 1600px;
     margin: 0 auto;
-    padding: 14px 24px;
+    padding: 0 24px;
     display: flex;
     align-items: center;
     justify-content: space-between;
 }
 .app-header__brand { font-weight: 600; color: var(--text); font-size: 16px; }
-.app-header__nav a { color: var(--muted); margin-left: 16px; }
+.app-header__nav a { color: var(--nav-inactive); margin-left: 16px; }
 
 .app-main {
     max-width: 1600px;
     margin: 0 auto;
     padding: 24px;
+}
+
+.app-main--home {
+    padding: 24px;
+}
+
+.page-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-card);
+    padding: 28px 32px;
 }
 
 /* ---- Full-width viewer layout ---- */
@@ -63,7 +81,8 @@ body.viewer-mode {
 }
 
 .app-header--compact .app-header__inner {
-    padding: 8px 12px;
+    padding: 0 16px;
+    min-height: 56px;
 }
 
 .app-header__inner--full {
@@ -74,10 +93,11 @@ body.viewer-mode {
     max-width: none;
     margin: 0;
     padding: 0;
-    height: calc(100vh - 41px);
+    height: calc(100vh - 57px);
     display: flex;
     flex-direction: column;
     min-height: 0;
+    background: var(--bg);
 }
 
 .viewer-page {
@@ -88,17 +108,31 @@ body.viewer-mode {
     width: 100%;
 }
 
+.viewer-content-card {
+    background: var(--panel);
+    border-radius: 12px;
+    box-shadow: var(--shadow-card);
+    border: 1px solid var(--border);
+}
+
 .viewer-toolbar {
     display: flex;
     align-items: center;
     gap: 10px;
     flex-wrap: nowrap;
-    padding: 8px 12px;
+    padding: 16px 20px;
     background: var(--panel);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
-    min-height: 44px;
-    box-shadow: 0 1px 0 rgba(16, 24, 40, 0.04);
+    min-height: 56px;
+}
+
+.viewer-toolbar__title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.01em;
 }
 
 .viewer-toolbar__spacer {
@@ -187,19 +221,16 @@ body.viewer-mode {
 }
 
 .viewer-sidebar {
-    width: 240px;
+    width: 224px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    background: var(--panel);
-    border-right: 1px solid var(--border);
+    background: var(--bg);
     min-height: 0;
 }
 
 .viewer-sidebar__header {
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--border);
-    background: linear-gradient(180deg, #ffffff, #f8fafc);
+    padding: 0;
     flex-shrink: 0;
 }
 
@@ -232,9 +263,9 @@ body.viewer-mode {
 
 .viewer-sidebar__list::-webkit-scrollbar { width: 8px; }
 .viewer-sidebar__list::-webkit-scrollbar-thumb {
-    background: #c2cad6;
+    background: #cbd5e1;
     border-radius: 6px;
-    border: 2px solid var(--panel);
+    border: 2px solid var(--bg);
 }
 .viewer-sidebar__list::-webkit-scrollbar-thumb:hover { background: #9aa6b6; }
 
@@ -253,27 +284,26 @@ body.viewer-mode {
     gap: 10px;
     width: 100%;
     padding: 8px 10px;
-    border: 1px solid transparent;
+    border: none;
     border-radius: 6px;
     background: transparent;
-    color: var(--text);
-    font-size: 13px;
+    color: var(--nav-inactive);
+    font-size: 14px;
     font-weight: 500;
     text-align: left;
     cursor: pointer;
-    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    transition: color 0.12s;
 }
 
 .sheet-link:hover {
-    background: var(--accent-soft);
-    color: var(--accent);
+    color: var(--text);
 }
 
 .sheet-link--active {
-    background: var(--accent-soft);
-    color: var(--accent);
-    border-color: rgba(37, 99, 235, 0.25);
+    background: transparent !important;
+    color: var(--accent) !important;
     font-weight: 600;
+    box-shadow: none;
 }
 
 .sheet-link.is-hidden { display: none; }
@@ -283,22 +313,6 @@ body.viewer-mode {
     text-overflow: ellipsis;
     white-space: nowrap;
     flex: 1;
-}
-
-.sheet-link__count {
-    flex-shrink: 0;
-    background: var(--border);
-    color: var(--muted);
-    padding: 1px 8px;
-    border-radius: 10px;
-    font-size: 11px;
-    font-weight: 500;
-}
-
-.sheet-link:hover .sheet-link__count,
-.sheet-link--active .sheet-link__count {
-    background: var(--accent);
-    color: white;
 }
 
 .viewer-workspace {
@@ -313,6 +327,7 @@ body.viewer-mode {
 /* Reload button visual when triggered */
 .viewer-toolbar__reload {
     flex-shrink: 0;
+    padding: 0 !important;
 }
 .viewer-toolbar__reload.is-loading {
     opacity: 0.6;
@@ -321,6 +336,9 @@ body.viewer-mode {
 .viewer-toolbar__reload.is-loading .btn-tool__icon {
     display: inline-block;
     animation: viewer-spin 0.7s linear infinite;
+}
+.viewer-toolbar__reload .btn-tool__icon {
+    color: #ffffff;
 }
 
 @keyframes viewer-spin {
@@ -348,6 +366,7 @@ body.viewer-mode {
     display: flex;
     flex-direction: column;
     background: var(--panel);
+    overflow: hidden;
 }
 
 .sheet-panel.is-hidden {
@@ -358,9 +377,9 @@ body.viewer-mode {
     flex-shrink: 0;
     max-height: 35vh;
     overflow: auto;
-    padding: 6px 8px;
+    padding: 16px 24px;
     border-bottom: 1px solid var(--border);
-    background: #fbfbf7;
+    background: var(--panel);
 }
 
 .freeform-panel.is-hidden {
@@ -372,10 +391,10 @@ body.viewer-mode {
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 8px 10px 12px;
+    padding: 20px 24px 24px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
 }
 
 .page h1 { margin: 0 0 4px; font-size: 22px; }
@@ -398,12 +417,18 @@ body.viewer-mode {
     align-items: center;
     gap: 12px;
     background: var(--panel);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
     border-radius: 8px;
     padding: 14px 16px;
     color: var(--text);
+    transition: border-color 0.12s, box-shadow 0.12s;
 }
-.file-list__item:hover { border-color: var(--accent); text-decoration: none; background: var(--accent-soft); }
+.file-list__item:hover {
+    border-color: var(--accent);
+    text-decoration: none;
+    background: var(--panel);
+    box-shadow: var(--shadow-card);
+}
 .file-list__icon {
     background: var(--accent);
     color: white;
@@ -477,10 +502,10 @@ body.viewer-mode {
 
 /* Description block */
 .description-block {
-    background: #fbfbf7;
+    background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 6px 8px;
+    border-radius: 8px;
+    padding: 12px 16px;
     margin-bottom: 6px;
 }
 .description-block:last-child {
@@ -508,19 +533,16 @@ body.viewer-mode {
 
 /* Table block (one logical table inside a sheet) */
 .table-block {
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    border: none;
+    border-radius: 0;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
     min-height: 220px;
-    /* Constrain block height so .table-scroll becomes the real vertical
-       scroller — this is what makes the sticky <thead> actually stick.
-       App header (~41px) + toolbar (~44px) + paddings ≈ 130px. */
-    max-height: calc(100vh - 130px);
+    max-height: calc(100vh - 200px);
     background: var(--panel);
-    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 1px rgba(16, 24, 40, 0.03);
+    box-shadow: none;
 }
 
 .table-block__bar {
@@ -528,20 +550,20 @@ body.viewer-mode {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 9px 14px;
-    background: linear-gradient(180deg, #ffffff, #f8fafc);
-    border-bottom: 1px solid var(--border);
+    padding: 0 0 12px;
+    background: transparent;
+    border-bottom: none;
     flex-shrink: 0;
 }
 
 .table-block__title-text {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 15px;
     color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    letter-spacing: 0.01em;
+    letter-spacing: -0.01em;
 }
 
 .table-block__actions {
@@ -555,22 +577,22 @@ body.viewer-mode {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 5px 10px;
+    padding: 6px 12px;
     font-size: 12px;
     font-weight: 500;
-    color: var(--text);
+    color: var(--nav-inactive);
     background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
     cursor: pointer;
     white-space: nowrap;
-    transition: background 0.12s, border-color 0.12s;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
 
 .btn-tool:hover {
-    background: var(--accent-soft);
-    border-color: var(--accent);
-    color: var(--accent);
+    background: var(--bg);
+    border-color: #cbd5e1;
+    color: var(--text);
 }
 
 .btn-tool__icon {
@@ -597,6 +619,9 @@ body.viewer-mode {
     -webkit-overflow-scrolling: touch;
     scrollbar-color: #c2cad6 transparent;
     scrollbar-width: thin;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background: var(--panel);
 }
 
 .table-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -610,6 +635,10 @@ body.viewer-mode {
 
 /* Data table */
 .data-table {
+    --cell-pad-x: 16px;
+    --cell-pad-y: 11px;
+    --header-h: 44px;
+    --filter-h: 40px;
     border-collapse: separate;
     border-spacing: 0;
     font-size: 13px;
@@ -619,24 +648,39 @@ body.viewer-mode {
     background: var(--panel);
 }
 
+.data-table thead {
+    background: var(--bg);
+}
+
 /* Fixed header row height — keeps the sticky filter row offset predictable */
-.data-table__headers th { height: 40px; }
-.data-table__filters th { height: 36px; }
+.data-table__headers th {
+    height: var(--header-h);
+    min-height: var(--header-h);
+}
+
+.data-table__filters th {
+    height: var(--filter-h);
+    min-height: var(--filter-h);
+}
 
 .data-table__th {
-    background: linear-gradient(180deg, #f3f6fb 0%, #e7ecf3 100%);
+    background: var(--bg);
     text-align: left;
-    padding: 0;
-    border-bottom: 1px solid #cfd6df;
-    border-right: 1px solid #d8dee6;
+    padding: 0 var(--cell-pad-x);
+    padding-right: calc(var(--cell-pad-x) + 6px);
+    border-bottom: 1px solid var(--border-strong);
+    border-right: none;
     position: sticky;
     top: 0;
     z-index: 3;
+    box-sizing: border-box;
     font-weight: 600;
     vertical-align: middle;
     cursor: grab;
-    min-width: 96px;
-    box-shadow: inset 0 -1px 0 #cfd6df;
+    min-width: 120px;
+    box-shadow: none;
+    line-height: 1.35;
+    color: var(--muted);
 }
 
 .data-table__th:active { cursor: grabbing; }
@@ -652,18 +696,28 @@ body.viewer-mode {
 
 .th-label {
     display: block;
-    padding: 10px 18px 10px 12px;
+    margin: 0;
+    padding: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 12.5px;
-    color: #2d3a4b;
+    font-size: 12px;
+    font-weight: 600;
+    color: inherit;
+    text-align: inherit;
+    line-height: 1.35;
     letter-spacing: 0.02em;
+    text-transform: none;
 }
 
-.data-table thead th.cell-display {
-    max-width: none;
-    white-space: nowrap;
+.data-table__th[style*="text-align: center"] .th-label,
+.data-table__th[style*="text-align:center"] .th-label {
+    text-align: center;
+}
+
+.data-table__th[style*="text-align: right"] .th-label,
+.data-table__th[style*="text-align:right"] .th-label {
+    text-align: right;
 }
 
 .data-table__th:last-child,
@@ -672,15 +726,16 @@ body.viewer-mode {
 }
 
 .data-table__filter-th {
-    top: 40px; /* matches header row height */
-    background: #f5f7fa;
-    padding: 5px 6px;
+    top: var(--header-h);
+    background: var(--panel);
+    padding: 8px var(--cell-pad-x);
+    box-sizing: border-box;
     font-weight: normal;
     z-index: 2;
     position: sticky;
-    border-bottom: 1px solid #d8dee6;
-    border-right: 1px solid #e3e7ec;
-    min-width: 96px;
+    border-bottom: 2px solid var(--border-strong);
+    border-right: none;
+    min-width: 120px;
     vertical-align: middle;
 }
 
@@ -701,18 +756,21 @@ body.viewer-mode {
 }
 
 .col-filter {
+    display: block;
     width: 100%;
-    min-width: 80px;
-    padding: 5px 8px;
-    border: 1px solid #cfd6df;
-    border-radius: 4px;
+    min-width: 0;
+    margin: 0;
+    padding: 6px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
     font-size: 12px;
-    background: #ffffff;
+    background: var(--panel);
     color: var(--text);
     transition: border-color 0.12s, box-shadow 0.12s;
+    box-sizing: border-box;
 }
-.col-filter::placeholder { color: #98a2b3; }
-.col-filter:hover { border-color: #aab4c2; }
+.col-filter::placeholder { color: #94a3b8; }
+.col-filter:hover { border-color: #cbd5e1; }
 .col-filter:focus {
     outline: none;
     border-color: var(--accent);
@@ -750,27 +808,84 @@ body.viewer-mode {
 }
 
 .data-table tbody td {
-    padding: 9px 14px;
-    border-bottom: 1px solid #eef1f5;
-    border-right: 1px solid #f2f4f7;
-    line-height: 1.5;
+    padding: var(--cell-pad-y) var(--cell-pad-x);
+    border-bottom: 1px solid var(--border);
+    border-right: none;
+    line-height: 1.45;
     color: var(--text);
     vertical-align: top;
+    background: var(--panel);
+    font-size: 13px;
 }
-.data-table tbody td:last-child { border-right: none; }
-.data-table tbody tr:nth-child(even) td:not([style*="background-color"]) { background: #fafbfd; }
-.data-table tbody tr:hover td:not([style*="background-color"]) { background: #eef4ff; }
-.data-table tbody tr:last-child td { border-bottom: none; }
+
+.data-table tbody td[style*="text-align: center"],
+.data-table tbody td[style*="text-align:center"] {
+    text-align: center;
+}
+
+.data-table tbody td[style*="text-align: right"],
+.data-table tbody td[style*="text-align:right"] {
+    text-align: right;
+}
+.data-table tbody tr:hover td:not([style*="background-color"]) {
+    background: var(--row-hover);
+}
+.data-table tbody tr:last-child td { border-bottom: 1px solid var(--border); }
+
+/* Persistent row selection — soft blue like TaxPal checkbox row */
+.data-table tbody tr.row-selected td {
+    background: var(--accent-soft) !important;
+}
+.data-table tbody tr.row-selected:hover td {
+    background: #dbeafe !important;
+}
+.data-table tbody tr.data-row {
+    cursor: pointer;
+}
+
+/* Between-tables: all freeform lines merged into one UI row */
+.between-tables-row-wrap {
+    flex-shrink: 0;
+    margin: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--accent-soft);
+}
+
+.between-tables-row-wrap.is-hidden {
+    display: none;
+}
+
+.between-tables-table {
+    background: transparent;
+}
+
+.between-tables-table__cell {
+    display: block;
+    padding: 10px 16px;
+    color: var(--nav-inactive);
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    border-left: 3px solid var(--accent);
+    vertical-align: top;
+}
+
+.between-tables-table__cell.cell-display--truncated {
+    cursor: pointer;
+}
 
 .data-table__footer {
-    padding: 9px 14px !important;
-    background: #f5f7fa !important;
+    padding: 10px var(--cell-pad-x) !important;
+    background: var(--bg) !important;
     color: var(--muted);
     font-size: 12px;
     position: sticky;
     bottom: 0;
     white-space: normal !important;
-    border-top: 1px solid #e3e7ec;
+    border-top: 1px solid var(--border-strong);
     z-index: 2;
 }
 .data-table__footer .row-visible,
