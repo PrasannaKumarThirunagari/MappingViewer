@@ -28,7 +28,9 @@ if (wb == null)
 foreach (var sheet in wb.Sheets)
 {
     Console.WriteLine($"=== {sheet.Name} ===");
+    Console.WriteLine($"  Has tables: {sheet.HasDetectedTables}");
     Console.WriteLine($"  Description rows: {sheet.Description.Count}");
+    Console.WriteLine($"  Raw sheet rows: {sheet.RawSheetRows.Count}");
     Console.WriteLine($"  Blocks: {sheet.Blocks.Count}");
     foreach (var block in sheet.Blocks)
     {

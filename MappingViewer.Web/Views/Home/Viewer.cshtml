@@ -35,6 +35,23 @@
             ? "cell-display cell-display--wrap"
             : "cell-display";
     }
+
+    // Excel-style column letter for index 1 = A, 2 = B, ..., 26 = Z, 27 = AA, ...
+    string ExcelColumnLetter(int oneBased)
+    {
+        if (oneBased < 1) return string.Empty;
+        var sb = new System.Text.StringBuilder();
+        int n = oneBased;
+        while (n > 0)
+        {
+            int rem = (n - 1) % 26;
+            sb.Insert(0, (char)('A' + rem));
+            n = (n - 1) / 26;
+        }
+        return sb.ToString();
+    }
+
+    const int LongCellThreshold = 150;
 }
 
 <section class="viewer-page flex flex-col min-h-0 flex-1 w-full bg-slate-50">
@@ -44,8 +61,8 @@
     }
     else
     {
-        <div class="viewer-body flex flex-1 min-h-0 min-w-0">
-            <aside class="viewer-sidebar w-56 shrink-0 flex flex-col bg-slate-50 min-h-0" aria-label="Sheets">
+        <div id="viewerBody" class="viewer-body flex flex-1 min-h-0 min-w-0">
+            <aside id="viewerSidebar" class="viewer-sidebar w-56 shrink-0 flex flex-col bg-slate-50 min-h-0" aria-label="Sheets">
                 <div class="viewer-sidebar__header px-4 pt-5 pb-3">
                     <div class="flex items-center justify-between gap-2 mb-3">
                         <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Sheets</span>
@@ -80,11 +97,28 @@
                     }
                 </nav>
                 <p id="sheetSearchEmpty" class="viewer-sidebar__empty is-hidden px-4 py-3 text-center text-xs text-slate-500">No sheets match.</p>
+                <div class="viewer-sidebar__footer shrink-0 px-4 py-4 border-t border-slate-200 mt-auto">
+                    <a class="viewer-sidebar__brand inline-flex items-center gap-2.5 text-slate-800 font-semibold text-sm hover:no-underline"
+                       asp-controller="Home" asp-action="Index" title="Back to workbooks">
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold shadow-sm">M</span>
+                        <span>Mapping Viewer</span>
+                    </a>
+                </div>
             </aside>
 
-            <div class="viewer-workspace flex-1 min-w-0 min-h-0 flex flex-col p-4 md:p-6">
+            <div class="viewer-workspace flex-1 min-w-0 min-h-0 flex flex-col p-3 md:p-4">
             <div class="viewer-content-card flex flex-col flex-1 min-h-0 bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-            <div class="viewer-toolbar flex items-center gap-2 sm:gap-3 flex-nowrap px-5 py-4 border-b border-slate-100 shrink-0">
+            <div class="viewer-toolbar flex items-center gap-2 sm:gap-3 flex-nowrap px-4 py-3 border-b border-slate-100 shrink-0">
+                <button id="toggleSidebar" type="button"
+                        class="sidebar-toggle shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-blue-600 hover:border-blue-300 transition-colors"
+                        aria-controls="viewerSidebar"
+                        aria-expanded="true"
+                        title="Hide sheet list">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75Zm0 5.5a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75ZM2.75 14a.75.75 0 0 0 0 1.5h14.5a.75.75 0 0 0 0-1.5H2.75Z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="visually-hidden">Toggle sheet list</span>
+                </button>
                 <h2 class="viewer-toolbar__title text-base font-semibold text-slate-800 truncate mr-2">@Model.FileName</h2>
                 <label class="visually-hidden" for="workbookSelect">Workbook</label>
                 <select id="workbookSelect"
@@ -127,37 +161,111 @@
                 var sheet = Model.Sheets[i];
                 var hidden = i == 0 ? "" : "is-hidden";
 
-                <div id="sheet-@i" class="sheet-panel @hidden" role="tabpanel" data-sheet-name="@sheet.Name">
-
-                    @if (sheet.Description.Count > 0)
-                    {
-                        <div class="freeform-panel" data-freeform-panel>
-                            <div class="description-block">
-                                <div class="description-block__label">Description</div>
-                                <table class="description-table">
-                                    <tbody>
-                                        @foreach (var row in sheet.Description)
-                                        {
-                                            <tr>
-                                                @foreach (var cell in row)
-                                                {
-                                                    <td class="@CellDisplayClass(cell)"
-                                                        style="@CellStyle(cell)"
-                                                        data-full-text="@cell.Value">@cell.Value</td>
-                                                }
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    }
-
-                    @if (sheet.Blocks.Count == 0 && sheet.Description.Count == 0)
+                <div id="sheet-@i" class="sheet-panel @hidden" role="tabpanel"
+                     data-sheet-name="@sheet.Name"
+                     data-sheet-mode="@(sheet.HasDetectedTables ? "tables" : "raw")">
+                    @if (!sheet.HasDetectedTables && sheet.RawSheetRows.Count == 0)
                     {
                         <p class="empty">This sheet is empty.</p>
                     }
+                    else if (!sheet.HasDetectedTables && sheet.RawSheetRows.Count > 0)
+                    {
+                        var rawMaxCols = sheet.RawDisplayColumnCount;
+                        @* No structured table detected — show full sheet as one filterable grid. *@
+                        <div class="tables-stack">
+                            <div class="table-block raw-sheet-block" data-table-index="0">
+                                <div class="table-block__bar">
+                                    <span class="table-block__title-text">@sheet.Name</span>
+                                    <span class="raw-sheet-block__hint">No tables detected — showing sheet content</span>
+                                    <div class="table-block__actions">
+                                        <button type="button" class="btn-tool" data-expand-table title="Expand">
+                                            <span class="btn-tool__icon" aria-hidden="true">⛶</span>
+                                            <span>Expand</span>
+                                        </button>
+                                        <button type="button" class="btn-tool" data-reset-columns title="Reset column order and width">
+                                            <span class="btn-tool__icon" aria-hidden="true">↺</span>
+                                            <span>Reset cols</span>
+                                        </button>
+                                    </div>
+                                </div>
 
+                                <div class="table-scroll">
+                                    <table class="data-table data-table--raw" id="rawtable-@i">
+                                        <colgroup>
+                                            @for (var c = 0; c < rawMaxCols; c++)
+                                            {
+                                                <col data-col-idx="@c" />
+                                            }
+                                        </colgroup>
+                                        <thead>
+                                            <tr class="data-table__headers">
+                                                @for (var c = 0; c < rawMaxCols; c++)
+                                                {
+                                                    var letter = ExcelColumnLetter(c + 1);
+                                                    <th class="data-table__th"
+                                                        data-col-idx="@c"
+                                                        draggable="true"
+                                                        data-full-text="@letter">
+                                                        <span class="th-label">@letter</span>
+                                                        <span class="col-resize-handle" title="Resize column"></span>
+                                                    </th>
+                                                }
+                                            </tr>
+                                            <tr class="data-table__filters">
+                                                @for (var c = 0; c < rawMaxCols; c++)
+                                                {
+                                                    <th class="data-table__filter-th" data-col-idx="@c">
+                                                        <input type="search" class="col-filter"
+                                                               data-col="@c"
+                                                               placeholder="Filter…"
+                                                               autocomplete="off" />
+                                                    </th>
+                                                }
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @{ var rawRowIndex = 0; }
+                                            @foreach (var row in sheet.RawSheetRows)
+                                            {
+                                                <tr class="data-row" data-row-index="@rawRowIndex">
+                                                    @for (var c = 0; c < rawMaxCols; c++)
+                                                    {
+                                                        var cell = c < row.Count ? row[c] : new MappingViewer.Web.Models.CellData();
+                                                        var isLongCell = cell.Value.Length > LongCellThreshold;
+                                                        <td class="@CellDisplayClass(cell)@(isLongCell ? " cell-display--long" : "")"
+                                                            data-col-idx="@c"
+                                                            style="@CellStyle(cell)"
+                                                            data-full-text="@cell.Value">
+                                                            @if (isLongCell)
+                                                            {
+                                                                <span class="cell-preview">@(cell.Value.Substring(0, LongCellThreshold))…</span>
+                                                                <button type="button" class="cell-details-link">View details</button>
+                                                            }
+                                                            else
+                                                            {
+                                                                @cell.Value
+                                                            }
+                                                        </td>
+                                                    }
+                                                </tr>
+                                                rawRowIndex++;
+                                            }
+                                        </tbody>
+                                        <tfoot>
+                                            <tr>
+                                                <td colspan="@rawMaxCols" class="data-table__footer">
+                                                        Showing <span class="row-visible">@sheet.RawSheetRows.Count</span>
+                                                        of <span class="row-total">@sheet.RawSheetRows.Count</span> rows
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else if (sheet.HasDetectedTables)
+                    {
                     <div class="tables-stack">
                         @for (var bi = 0; bi < sheet.Blocks.Count; bi++)
                         {
@@ -175,7 +283,10 @@
                                 var noteFullText = string.Join("\n", noteSegments);
                                 @if (noteSegments.Count > 0)
                                 {
-                                    <div class="between-tables-row-wrap" data-between-note data-freeform-panel>
+                                    @* Between-table notes always show — they're inline context for the
+                                       table that follows. The "Show description" toggle controls only the
+                                       sheet-level description block above the first table. *@
+                                    <div class="between-tables-row-wrap" data-between-note>
                                         <table class="between-tables-table w-full border-collapse">
                                             <tbody>
                                                 <tr>
@@ -261,10 +372,21 @@
                                                         @for (var c = 0; c < table.Headers.Count; c++)
                                                         {
                                                             var cell = c < row.Count ? row[c] : new MappingViewer.Web.Models.CellData();
-                                                            <td class="@CellDisplayClass(cell)"
+                                                            var isLongCell = cell.Value.Length > LongCellThreshold;
+                                                            <td class="@CellDisplayClass(cell)@(isLongCell ? " cell-display--long" : "")"
                                                                 data-col-idx="@c"
                                                                 style="@CellStyle(cell)"
-                                                                data-full-text="@cell.Value">@cell.Value</td>
+                                                                data-full-text="@cell.Value">
+                                                                @if (isLongCell)
+                                                                {
+                                                                    <span class="cell-preview">@(cell.Value.Substring(0, LongCellThreshold))…</span>
+                                                                    <button type="button" class="cell-details-link">View details</button>
+                                                                }
+                                                                else
+                                                                {
+                                                                    @cell.Value
+                                                                }
+                                                            </td>
                                                         }
                                                     </tr>
                                                     rowIndex++;
@@ -284,6 +406,36 @@
                             }
                         }
                     </div>
+
+                    @if (sheet.Description.Count > 0)
+                    {
+                        <div class="freeform-panel" data-freeform-panel>
+                            <div class="description-block">
+                                <div class="description-block__label">Description</div>
+                                <table class="description-table">
+                                    <tbody>
+                                        @foreach (var row in sheet.Description)
+                                        {
+                                            <tr>
+                                                @foreach (var cell in row)
+                                                {
+                                                    <td class="@CellDisplayClass(cell)"
+                                                        style="@CellStyle(cell)"
+                                                        data-full-text="@cell.Value">@cell.Value</td>
+                                                }
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    }
+
+                    }
+                    else
+                    {
+                        <p class="empty">This sheet has no displayable content.</p>
+                    }
                 </div>
             }
             </div>
@@ -315,7 +467,7 @@
     <div class="cell-popup__backdrop" data-close-popup></div>
     <div class="cell-popup__panel">
         <div class="cell-popup__header">
-            <h2 id="cellPopupTitle" class="cell-popup__title">Cell value</h2>
+            <h2 id="cellPopupTitle" class="cell-popup__title">Cell details</h2>
             <button type="button" class="cell-popup__close" data-close-popup aria-label="Close">&times;</button>
         </div>
         <pre id="cellPopupContent" class="cell-popup__content"></pre>

@@ -93,7 +93,7 @@ body.viewer-mode {
     max-width: none;
     margin: 0;
     padding: 0;
-    height: calc(100vh - 57px);
+    height: 100vh;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -227,6 +227,36 @@ body.viewer-mode {
     flex-direction: column;
     background: var(--bg);
     min-height: 0;
+    border-right: 1px solid var(--border-strong);
+    transition: width 0.2s ease, margin 0.2s ease, opacity 0.2s ease;
+}
+
+.viewer-sidebar__footer {
+    background: var(--bg);
+}
+
+.viewer-sidebar__brand {
+    color: var(--text);
+}
+
+.viewer-body.sidebar-collapsed .viewer-sidebar {
+    width: 0;
+    min-width: 0;
+    margin-left: 0;
+    border-right: none;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.viewer-body.sidebar-collapsed .viewer-workspace {
+    padding-left: 0.75rem;
+}
+
+.sidebar-toggle[aria-expanded="false"] {
+    color: var(--accent);
+    border-color: #93c5fd;
+    background: var(--accent-soft);
 }
 
 .viewer-sidebar__header {
@@ -367,6 +397,18 @@ body.viewer-mode {
     flex-direction: column;
     background: var(--panel);
     overflow: hidden;
+}
+
+.sheet-panel .tables-stack {
+    flex: 1;
+    min-height: 0;
+    order: 1;
+}
+
+.sheet-panel .freeform-panel {
+    order: 2;
+    flex-shrink: 0;
+    max-height: 28vh;
 }
 
 .sheet-panel.is-hidden {
@@ -540,7 +582,7 @@ body.viewer-mode {
     flex-direction: column;
     flex-shrink: 0;
     min-height: 220px;
-    max-height: calc(100vh - 200px);
+    max-height: calc(100vh - 120px);
     background: var(--panel);
     box-shadow: none;
 }
@@ -564,6 +606,22 @@ body.viewer-mode {
     text-overflow: ellipsis;
     white-space: nowrap;
     letter-spacing: -0.01em;
+}
+
+.raw-sheet-block__bar {
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.raw-sheet-block__hint {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-left: auto;
+}
+
+.raw-sheet-block .table-block__bar {
+    flex-wrap: wrap;
 }
 
 .table-block__actions {
@@ -805,6 +863,31 @@ body.viewer-mode {
 .cell-display--truncated { cursor: pointer; }
 .cell-display--truncated:hover {
     box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.cell-display--long .cell-preview {
+    display: block;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 4px;
+}
+
+.cell-details-link {
+    display: inline-block;
+    margin-top: 2px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.cell-details-link:hover {
+    color: #1d4ed8;
 }
 
 .data-table tbody td {

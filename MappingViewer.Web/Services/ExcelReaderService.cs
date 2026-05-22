@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using MappingViewer.Web.Models;
 using Microsoft.Extensions.Options;
 using OfficeOpenXml;
@@ -78,15 +79,54 @@ public class ExcelReaderService : IExcelReaderService
                 (_detection.TableTitleMinimumFilledCells, _detection.TableTitleMaximumFilledCells);
         }
 
-        if (!_detection.DetectHeaderByBackgroundColor && !_detection.DetectHeaderByBoldFont)
+        if (!_detection.DetectHeaderByBackgroundColor
+            && !_detection.DetectHeaderByBoldFont
+            && !_detection.DetectHeaderByColumnLabels)
         {
             _logger.LogWarning(
-                "No header detection method is enabled. Enable DetectHeaderByBackgroundColor or DetectHeaderByBoldFont.");
+                "No header detection method is enabled. Enable DetectHeaderByBackgroundColor, DetectHeaderByBoldFont, or DetectHeaderByColumnLabels.");
         }
 
         if (_detection.DetectHeaderByBackgroundColor && _detection.HeaderBackgroundColors.Count == 0)
         {
             _logger.LogWarning("DetectHeaderByBackgroundColor is true but HeaderBackgroundColors is empty.");
+        }
+
+        if (_detection.DetectHeaderByColumnLabels && _detection.HeaderColumnLabels.Count == 0)
+        {
+            _logger.LogWarning("DetectHeaderByColumnLabels is true but HeaderColumnLabels is empty.");
+        }
+
+        if (_detection.HeaderColumnLabelMinimumMatches < 1)
+        {
+            _detection.HeaderColumnLabelMinimumMatches = 1;
+        }
+
+        if (_detection.DetectHeaderByColumnLabels)
+        {
+            foreach (var label in _detection.HeaderColumnLabels)
+            {
+                if (string.IsNullOrWhiteSpace(label))
+                {
+                    continue;
+                }
+
+                if (_detection.HeaderColumnLabelsAreRegexPatterns)
+                {
+                    try
+                    {
+                        _ = new Regex(label.Trim(), RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        _logger.LogWarning(ex, "Invalid HeaderColumnLabels regex: {Pattern}", label);
+                    }
+                }
+                else if (SheetTableDetector.StripForLabelMatch(label).Length == 0)
+                {
+                    _logger.LogWarning("HeaderColumnLabels entry is empty after normalization: {Pattern}", label);
+                }
+            }
         }
     }
 
@@ -238,6 +278,24 @@ public class ExcelReaderService : IExcelReaderService
 
             if (kind == SheetRowKind.Header)
             {
+                var headerCells = TrimTrailingBlanks(row.Cells);
+                var headerHasText = headerCells.Exists(c => !string.IsNullOrWhiteSpace(c.Value));
+
+                if (!headerHasText)
+                {
+                    // Misclassified or empty header band — keep as freeform content.
+                    var orphanHeader = TrimTrailingBlanks(row.Cells);
+                    if (!firstTableSeen)
+                    {
+                        sheet.Description.Add(orphanHeader);
+                    }
+                    else
+                    {
+                        betweenTableRows.Add(orphanHeader);
+                    }
+                    continue;
+                }
+
                 FlushBetweenTableNotes();
                 CloseCurrentTable();
 
@@ -251,7 +309,7 @@ public class ExcelReaderService : IExcelReaderService
                     Title = titleText,
                     TitleBackgroundColor = NeutralizeDisplayColor(titleBg),
                     TitleFontColor = titleFont,
-                    Headers = TrimTrailingBlanks(row.Cells)
+                    Headers = headerCells
                 };
                 pendingTitleRow = null;
                 firstTableSeen = true;
@@ -289,7 +347,56 @@ public class ExcelReaderService : IExcelReaderService
         FlushBetweenTableNotes();
         CloseCurrentTable();
 
+        if (pendingTitleRow != null)
+        {
+            var pendingTrimmed = TrimTrailingBlanks(pendingTitleRow.Cells);
+            if (pendingTrimmed.Exists(c => !string.IsNullOrWhiteSpace(c.Value)))
+            {
+                if (!firstTableSeen)
+                {
+                    sheet.Description.Add(pendingTrimmed);
+                }
+                else
+                {
+                    betweenTableRows.Add(pendingTrimmed);
+                    FlushBetweenTableNotes();
+                }
+            }
+        }
+
+        if (!sheet.HasDetectedTables)
+        {
+            sheet.RawSheetRows = BuildRawSheetRows(rowCache, rowCount);
+            sheet.Description.Clear();
+            sheet.Blocks.Clear();
+        }
+
         return sheet;
+    }
+
+    /// <summary>All non-blank rows in sheet order — used when no structured table was detected.</summary>
+    private static List<List<CellData>> BuildRawSheetRows(
+        Dictionary<int, SheetRowSnapshot> rowCache,
+        int rowCount)
+    {
+        var rows = new List<List<CellData>>();
+        for (int r = 1; r <= rowCount; r++)
+        {
+            if (!rowCache.TryGetValue(r, out var snap) || snap.IsBlank)
+            {
+                continue;
+            }
+
+            var trimmed = TrimTrailingBlanks(snap.Cells);
+            if (trimmed.Count == 0 || trimmed.TrueForAll(c => string.IsNullOrWhiteSpace(c.Value)))
+            {
+                continue;
+            }
+
+            rows.Add(trimmed);
+        }
+
+        return rows;
     }
 
     /// <summary>
@@ -318,11 +425,34 @@ public class ExcelReaderService : IExcelReaderService
             values = rangeValue as object[,];
         }
 
-        // Decode each styleId only once — typically tens of unique styles across the sheet.
+        // Decode each unique styleId at most once. Most workbooks reuse a handful of
+        // style ids across thousands of cells, so this dominates the cost reduction.
         var styleCache = new Dictionary<int, DecodedStyle>(64);
+        // The default style (id 0 in most workbooks) is overwhelmingly common — decode
+        // it once up front so the inner loop can skip the dictionary lookup entirely.
+        var defaultStyle = DecodeStyle(ws, 1, 1);
+        int defaultStyleId = ws.Cells[1, 1].StyleID;
+        styleCache[defaultStyleId] = defaultStyle;
 
         for (int r = 1; r <= rowCount; r++)
         {
+            // --- Fast path 1: row entirely empty in the bulk values array. ---
+            // For very large mostly-empty sheets this saves O(colCount) work and
+            // O(colCount) CellData allocations per blank row.
+            if (values != null)
+            {
+                bool allNull = true;
+                for (int c = 0; c < colCount; c++)
+                {
+                    if (values[r - 1, c] != null) { allNull = false; break; }
+                }
+                if (allNull)
+                {
+                    cache[r] = SheetTableDetector.CreateBlankSnapshot(r);
+                    continue;
+                }
+            }
+
             var list = new List<CellData>(colCount);
             for (int c = 1; c <= colCount; c++)
             {
@@ -347,8 +477,14 @@ public class ExcelReaderService : IExcelReaderService
                     }
                 }
 
-                var styleId = ws.Cells[r, c].StyleID;
-                if (!styleCache.TryGetValue(styleId, out var style))
+                // --- Fast path 2: skip the dict lookup for the default styleId. ---
+                int styleId = ws.Cells[r, c].StyleID;
+                DecodedStyle style;
+                if (styleId == defaultStyleId)
+                {
+                    style = defaultStyle;
+                }
+                else if (!styleCache.TryGetValue(styleId, out style))
                 {
                     style = DecodeStyle(ws, r, c);
                     styleCache[styleId] = style;
@@ -421,17 +557,17 @@ public class ExcelReaderService : IExcelReaderService
 
     private static List<CellData> TrimTrailingBlanks(List<CellData> cells)
     {
-        var trimmed = new List<CellData>(cells);
-        while (trimmed.Count > 0)
+        // Compute how many cells from the end are blank+uncoloured; only copy if needed.
+        int trailing = 0;
+        for (int i = cells.Count - 1; i >= 0; i--)
         {
-            var last = trimmed[^1];
-            if (string.IsNullOrWhiteSpace(last.Value) && last.BackgroundColor == null)
-            {
-                trimmed.RemoveAt(trimmed.Count - 1);
-            }
+            var c = cells[i];
+            if (string.IsNullOrWhiteSpace(c.Value) && c.BackgroundColor == null) trailing++;
             else break;
         }
-        return trimmed;
+        if (trailing == 0) return cells;
+        if (trailing == cells.Count) return new List<CellData>(0);
+        return cells.GetRange(0, cells.Count - trailing);
     }
 
     public static string NormalizeHex(string hex)

@@ -97,10 +97,9 @@
         if (visEl) visEl.textContent = visible;
 
         table.querySelectorAll('.cell-display').forEach(function (el) {
-            if (el.closest('tbody')) {
-                var text = cellFullText(el);
-                el.classList.toggle('cell-display--truncated', text.length > 0 && isTruncated(el));
-            }
+            if (!el.closest('tbody') || el.classList.contains('cell-display--long')) return;
+            var text = cellFullText(el);
+            el.classList.toggle('cell-display--truncated', text.length > 0 && isTruncated(el));
         });
     }
 
@@ -159,10 +158,11 @@
         var toggle = document.getElementById('showDescription');
         if (!toggle) return;
         var visiblePanel = document.querySelector('.sheet-panel:not(.is-hidden)');
+        var isRawSheet = visiblePanel && visiblePanel.getAttribute('data-sheet-mode') === 'raw';
         var hasFreeform = visiblePanel && visiblePanel.querySelector('[data-freeform-panel]');
         var label = toggle.closest('.description-toggle');
         if (label) {
-            label.style.display = hasFreeform ? '' : 'none';
+            label.style.display = (!isRawSheet && hasFreeform) ? '' : 'none';
         }
     }
 
@@ -173,6 +173,7 @@
 
     function markTruncatedCells() {
         document.querySelectorAll('.cell-display').forEach(function (el) {
+            if (el.classList.contains('cell-display--long')) return;
             var text = cellFullText(el);
             var hasText = text.length > 0;
             el.classList.toggle('cell-display--truncated', hasText && isTruncated(el));
@@ -238,13 +239,26 @@
         });
     }
 
+    function setSidebarOpen(open) {
+        var body = document.getElementById('viewerBody');
+        var btn = document.getElementById('toggleSidebar');
+        if (!body) return;
+        body.classList.toggle('sidebar-collapsed', !open);
+        if (btn) {
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            btn.title = open ? 'Hide sheet list' : 'Show sheet list';
+        }
+    }
+
     global.MappingViewer = {
         getGlobalState: getGlobalState,
         getGlobalStateForExpand: getGlobalStateForExpand,
         applyFiltersToTable: applyFiltersToTable,
         applyAllFilters: applyAllFilters,
         markTruncatedCells: markTruncatedCells,
-        clearRowTextCache: clearRowTextCache
+        clearRowTextCache: clearRowTextCache,
+        openCellPopup: openCellPopup,
+        cellFullText: cellFullText
     };
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -281,13 +295,24 @@
             if (e.target.closest('.col-resize-handle') || e.target.closest('[data-expand-table]') ||
                 e.target.closest('[data-reset-columns]') || e.target.closest('.col-filter') ||
                 e.target.closest('.sheet-link') || e.target.closest('.viewer-toolbar') ||
-                e.target.closest('.viewer-sidebar__header') || e.target.closest('.table-block__actions') ||
-                e.target.closest('.table-expand-modal') || e.target.closest('.cell-popup')) {
+                e.target.closest('.viewer-sidebar__header') || e.target.closest('.viewer-sidebar__footer') ||
+                e.target.closest('.table-block__actions') || e.target.closest('.table-expand-modal') ||
+                e.target.closest('.cell-popup') || e.target.closest('#toggleSidebar')) {
+                return;
+            }
+
+            var detailsLink = e.target.closest('.cell-details-link');
+            if (detailsLink) {
+                var detailsCell = detailsLink.closest('td[data-full-text]');
+                if (detailsCell) {
+                    e.stopPropagation();
+                    openCellPopup(cellFullText(detailsCell));
+                }
                 return;
             }
 
             var truncatedCell = e.target.closest('.cell-display--truncated');
-            if (truncatedCell) {
+            if (truncatedCell && !truncatedCell.classList.contains('cell-display--long')) {
                 openCellPopup(cellFullText(truncatedCell));
                 return;
             }
@@ -398,6 +423,18 @@
             caseInput.addEventListener('change', function () {
                 clearRowTextCache();
                 applyAllFilters();
+            });
+        }
+
+        var toggleSidebar = document.getElementById('toggleSidebar');
+        var sidebarKey = 'mappingViewer.sidebarOpen';
+        if (toggleSidebar) {
+            var sidebarOpen = localStorage.getItem(sidebarKey);
+            setSidebarOpen(sidebarOpen !== 'false');
+            toggleSidebar.addEventListener('click', function () {
+                var open = !document.getElementById('viewerBody').classList.contains('sidebar-collapsed');
+                setSidebarOpen(!open);
+                localStorage.setItem(sidebarKey, (!open).toString());
             });
         }
     });

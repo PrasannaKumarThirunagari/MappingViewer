@@ -45,6 +45,11 @@ All layout rules are under `ExcelSettings:TableDetection`:
 | `HeaderBackgroundColors` | Hex colours that identify a **header** row (starts a new table). |
 | `DetectHeaderByBackgroundColor` | Enable colour-based header detection. |
 | `DetectHeaderByBoldFont` | Treat a row as header when every non-empty cell is **bold** (fallback if colours differ). |
+| `DetectHeaderByColumnLabels` | Treat a row as header when it contains configured column names (e.g. `SCM Field`). |
+| `HeaderColumnLabels` | Phrases or regex patterns to find on the same row (flexible case/spacing by default). |
+| `HeaderColumnLabelsAreRegexPatterns` | When `true`, each entry is a .NET regex (`IgnoreCase`). When `false`, phrases are auto-converted to flexible regex. |
+| `RequireAllHeaderColumnLabels` | When `true`, every label in `HeaderColumnLabels` must appear on the row. |
+| `HeaderColumnLabelMinimumMatches` | When `RequireAllHeaderColumnLabels` is `false`, how many labels must match. |
 | `HeaderMinimumFilledCells` | Minimum non-empty cells required on a header row (default `2`). |
 | `DetectTableTitleBeforeHeader` | Title = sparse text row **immediately above** the next header row. |
 | `TableTitleMinimumFilledCells` / `TableTitleMaximumFilledCells` | How many non-empty cells a title row may have (default `1`–`1`). Increase max for multi-cell titles. |
@@ -60,12 +65,18 @@ All layout rules are under `ExcelSettings:TableDetection`:
 4. Following **data** rows (enough filled cells) → table body until the next title/header.
 5. Other rows after the first table → notes between tables, then the next table.
 
+**If no table is detected** on a sheet, every non-blank row is shown as a single filterable grid (column letters A, B, C… as headers) so nothing is hidden behind the “Show notes” toggle.
+
 Example for mapping workbooks with grey headers and white single-line titles:
 
 ```json
 "TableDetection": {
   "HeaderBackgroundColors": [ "BFBFBF", "A6A6A6", "808080" ],
   "DetectHeaderByBackgroundColor": true,
+  "DetectHeaderByColumnLabels": true,
+  "HeaderColumnLabels": [ "SCM Field", "Data Type (Object)" ],
+  "HeaderColumnLabelsAreRegexPatterns": false,
+  "RequireAllHeaderColumnLabels": true,
   "HeaderMinimumFilledCells": 2,
   "DetectTableTitleBeforeHeader": true,
   "TableTitleBackgroundColors": [],
@@ -73,6 +84,19 @@ Example for mapping workbooks with grey headers and white single-line titles:
   "TableTitleMaximumFilledCells": 1,
   "DataRowMinimumFilledCells": 2
 }
+```
+
+For **plain-styled** tables (no grey header band), rely on column labels — set `DetectHeaderByBackgroundColor` to `false` if colours are unreliable, or leave both enabled so either rule can start a table.
+
+**Flexible label matching (default):** `SCM Field` matches `scm field`, `SCM  Field`, `Scm Field`, etc. Parentheses and spacing in `Data Type (Object)` are handled the same way.
+
+**Custom regex** (set `HeaderColumnLabelsAreRegexPatterns` to `true`):
+
+```json
+"HeaderColumnLabels": [
+  "scm\\s+field",
+  "data\\s+type\\s*\\(\\s*object\\s*\\)"
+]
 ```
 
 For a **single-column** table, set `HeaderMinimumFilledCells` and `DataRowMinimumFilledCells` to `1`.

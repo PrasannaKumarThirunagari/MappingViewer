@@ -20,6 +20,42 @@ public class TableDetectionSettings
     /// <summary>Match header rows when every non-empty cell is bold (optional fallback).</summary>
     public bool DetectHeaderByBoldFont { get; set; } = false;
 
+    /// <summary>
+    /// Match header rows when the row contains configured column label patterns
+    /// (regex or flexible phrase match — case and spacing tolerant).
+    /// </summary>
+    public bool DetectHeaderByColumnLabels { get; set; } = true;
+
+    /// <summary>
+    /// Patterns that identify a header row when matched on the same row.
+    /// When <see cref="HeaderColumnLabelsAreRegexPatterns"/> is false, each entry is turned into a
+    /// case-insensitive regex that allows flexible spacing (e.g. "SCM Field" matches "scm  field").
+    /// When true, each entry is used as a .NET regular expression (RegexOptions.IgnoreCase).
+    /// </summary>
+    public List<string> HeaderColumnLabels { get; set; } = new()
+    {
+        "Data Type (Object)",
+        "FHIR Data Type"
+    };
+
+    /// <summary>
+    /// When false (default), <see cref="HeaderColumnLabels"/> are literal phrases converted to flexible regex.
+    /// When true, each label is already a regular expression.
+    /// </summary>
+    public bool HeaderColumnLabelsAreRegexPatterns { get; set; } = false;
+
+    /// <summary>
+    /// When true, every entry in <see cref="HeaderColumnLabels"/> must appear on the row.
+    /// When false, at least <see cref="HeaderColumnLabelMinimumMatches"/> labels must appear.
+    /// </summary>
+    public bool RequireAllHeaderColumnLabels { get; set; } = false;
+
+    /// <summary>
+    /// Used when <see cref="RequireAllHeaderColumnLabels"/> is false:
+    /// minimum number of configured labels that must appear on the row.
+    /// </summary>
+    public int HeaderColumnLabelMinimumMatches { get; set; } = 1;
+
     /// <summary>Minimum non-empty cells required to treat a row as a header.</summary>
     public int HeaderMinimumFilledCells { get; set; } = 2;
 

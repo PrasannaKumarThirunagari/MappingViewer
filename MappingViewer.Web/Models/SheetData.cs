@@ -65,6 +65,28 @@ public class SheetData
         .Select(b => b.Table!)
         .ToList();
 
+    /// <summary>True when at least one structured table was detected on this sheet.</summary>
+    public bool HasDetectedTables => Blocks.Any(b => b.Table != null);
+
+    /// <summary>
+    /// When no table is detected, every non-blank row is stored here for direct grid display.
+    /// </summary>
+    public List<List<CellData>> RawSheetRows { get; set; } = new();
+
+    /// <summary>Column count for raw grid display (sheet width when no tables).</summary>
+    public int RawDisplayColumnCount
+    {
+        get
+        {
+            var max = MaxColumns;
+            foreach (var row in RawSheetRows)
+            {
+                if (row.Count > max) max = row.Count;
+            }
+            return Math.Max(max, 1);
+        }
+    }
+
     /// <summary>Widest header row in the sheet — used to size the description block columns.</summary>
     public int MaxColumns { get; set; }
 }
